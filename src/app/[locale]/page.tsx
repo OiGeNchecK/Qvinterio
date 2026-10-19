@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/button";
 import { SecretEmblem } from "@/components/secret-emblem";
+import { LightRays } from "@/components/light-rays";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
@@ -12,27 +13,36 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
   return (
     <div className="relative overflow-hidden">
-      <div className="gold-arc -left-[30%] top-[18rem] h-[60rem] w-[160%] -rotate-6" />
       <div className="gold-arc -right-[40%] top-[70rem] h-[50rem] w-[140%] rotate-[8deg]" />
 
-      <SiteHeader locale={locale} t={t} />
-
-      <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-10 lg:grid-cols-[3fr_2fr] lg:pt-16">
-        <div>
-          <p className="mb-5 text-xs uppercase tracking-[0.3em] text-olive-light">{t.home.eyebrow}</p>
-          <h1 className="font-display text-4xl font-semibold leading-tight text-white sm:text-5xl xl:text-6xl">
-            <span className="block sm:whitespace-nowrap">{t.home.title}</span>
-            <span className="block olive-text">{t.home.title2}</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-silver-dim">{t.home.lead}</p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <ButtonLink href={`/${locale}/login/?for=client`} className="px-9! py-4! text-lg!">
-              {t.nav.clientLogin}
-            </ButtonLink>
-          </div>
+      {/* First screen: light rays behind the emblem, darkened on the left for the text. */}
+      <div className="relative overflow-hidden bg-graphite">
+        <div className="absolute inset-0">
+          <LightRays />
         </div>
-        <SecretEmblem locale={locale} />
-      </section>
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--color-graphite)_0%,rgb(17_23_21/0.85)_30%,rgb(17_23_21/0.35)_55%,transparent_75%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-ink" />
+        <div className="gold-arc -left-[30%] top-[18rem] h-[60rem] w-[160%] -rotate-6 opacity-60" />
+
+        <SiteHeader locale={locale} t={t} />
+
+        <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-10 lg:grid-cols-[3fr_2fr] lg:pt-16">
+          <div>
+            <p className="mb-5 text-xs uppercase tracking-[0.3em] text-olive-light">{t.home.eyebrow}</p>
+            <h1 className="font-display text-4xl font-semibold leading-tight text-white sm:text-5xl xl:text-6xl">
+              <span className="block sm:whitespace-nowrap">{t.home.title}</span>
+              <span className="block olive-text">{t.home.title2}</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-lg text-silver-dim">{t.home.lead}</p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <ButtonLink href={`/${locale}/login/?for=client`} className="px-9! py-4! text-lg!">
+                {t.nav.clientLogin}
+              </ButtonLink>
+            </div>
+          </div>
+          <SecretEmblem locale={locale} />
+        </section>
+      </div>
 
       <section className="relative z-10 mx-auto max-w-7xl px-4 pb-16">
         <div className="grid gap-5 md:grid-cols-3">

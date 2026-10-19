@@ -3,6 +3,7 @@
 /* Palette taken from the Qvinterio logo. */
 @theme {
   --color-ink: #0e0e0d;
+  --color-graphite: #111715;
   --color-panel: #181716;
   --color-panel-2: #201f1d;
   --color-line: #34322e;
