@@ -1,27 +1,7 @@
-import { Logo } from "@/components/logo";
-import { LocaleSwitcher } from "@/components/locale-switcher";
 import { getDictionary } from "@/i18n";
-import { LoginForm } from "./login-form";
+import { LoginDialog } from "./login-dialog";
 
 export default async function LoginPage({ params }: PageProps<"/[locale]/login">) {
   const { locale, t } = getDictionary((await params).locale);
-
-  return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
-      <div className="gold-arc -left-1/2 top-1/3 h-[60rem] w-[200%] -rotate-6" />
-      <div className="absolute right-4 top-4">
-        <LocaleSwitcher />
-      </div>
-      <div className="relative w-full max-w-sm rounded-3xl border border-line bg-panel/90 p-8 shadow-2xl">
-        <div className="mb-8 flex flex-col items-center gap-4 text-center">
-          <Logo href={`/${locale}/`} size={56} />
-          <div>
-            <h1 className="font-display text-2xl text-white">{t.login.title}</h1>
-            <p className="mt-1 text-sm text-silver-dim">{t.login.subtitle}</p>
-          </div>
-        </div>
-        <LoginForm locale={locale} labels={t.login} />
-      </div>
-    </div>
-  );
+  return <LoginDialog locale={locale} t={t} />;
 }

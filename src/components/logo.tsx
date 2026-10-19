@@ -13,7 +13,7 @@ export function Logo({ href, size = 36 }: { href: string; size?: number }) {
         className="rounded-full ring-1 ring-line"
         priority
       />
-      <span className="font-display text-xl font-semibold tracking-wide">
+      <span className="hidden font-display text-xl font-semibold tracking-wide sm:inline">
         <span className="metal-text">qv</span>
         <span className="olive-text">interio</span>
       </span>

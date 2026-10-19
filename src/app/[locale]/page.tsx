@@ -17,19 +17,24 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
       <SiteHeader locale={locale} t={t} />
 
-      <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-10 lg:grid-cols-2 lg:pt-16">
+      <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-10 lg:grid-cols-[3fr_2fr] lg:pt-16">
         <div>
           <p className="mb-5 text-xs uppercase tracking-[0.3em] text-olive-light">{t.home.eyebrow}</p>
-          <h1 className="font-display text-4xl font-semibold leading-tight text-white sm:text-6xl">
-            {t.home.title}
+          <h1 className="font-display text-4xl font-semibold leading-tight text-white sm:text-5xl xl:text-6xl">
+            <span className="block sm:whitespace-nowrap">{t.home.title}</span>
+            <span className="block olive-text">{t.home.title2}</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg text-silver-dim">{t.home.lead}</p>
           <div className="mt-10 flex flex-wrap gap-3">
-            <ButtonLink href="#works">{t.home.ctaWorks}</ButtonLink>
-            <ButtonLink href={`/${locale}/dashboard/`} variant="ghost">{t.home.ctaClient}</ButtonLink>
+            <ButtonLink href={`/${locale}/login/?for=client`}>{t.nav.clientLogin}</ButtonLink>
           </div>
         </div>
-        <div className="relative mx-auto aspect-square w-full max-w-md">
+        {/* The emblem doubles as the (unlabelled) entrance to the admin panel. */}
+        <Link
+          href={`/${locale}/login/?for=admin`}
+          aria-label="Qvinterio"
+          className="relative mx-auto block aspect-square w-full max-w-md rounded-full"
+        >
           <div className="absolute inset-0 rounded-full bg-gold/10 blur-3xl" />
           <Image
             src={asset("/brand/emblem.webp")}
@@ -39,7 +44,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
             className="rounded-full object-cover ring-1 ring-line"
             priority
           />
-        </div>
+        </Link>
       </section>
 
       <section className="relative z-10 mx-auto max-w-7xl px-4 pb-16">
@@ -100,7 +105,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         <div className="rounded-3xl border border-line bg-gradient-to-br from-panel-2 to-panel p-8 sm:p-12">
           <h2 className="font-display text-3xl text-white">{t.home.clientTitle}</h2>
           <p className="mt-4 max-w-2xl text-silver-dim">{t.home.clientText}</p>
-          <ButtonLink href={`/${locale}/dashboard/`} className="mt-8">{t.home.ctaClient}</ButtonLink>
+          <ButtonLink href={`/${locale}/login/?for=client`} className="mt-8">{t.nav.clientLogin}</ButtonLink>
         </div>
       </section>
 

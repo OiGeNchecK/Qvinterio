@@ -108,11 +108,12 @@ export function RequireRole({
   useEffect(() => {
     if (auth.status === "anon") {
       const next = window.location.pathname.slice(basePath.length);
-      router.replace(`/${locale}/login/?next=${encodeURIComponent(next)}`);
+      const mode = roles.includes("client") ? "client" : roles.includes("worker") ? "team" : "admin";
+      router.replace(`/${locale}/login/?for=${mode}&next=${encodeURIComponent(next)}`);
     } else if (auth.status === "ready" && !allowed) {
       router.replace(`/${locale}/dashboard/`);
     }
-  }, [auth, allowed, locale, router]);
+  }, [auth, allowed, locale, roles, router]);
 
   if (auth.status !== "ready" || !allowed) return <Loading />;
   return <UserContext value={auth.user}>{children}</UserContext>;
