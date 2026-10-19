@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* Palette taken from the Qvinterio logo. */
+@theme {
+  --color-ink: #0e0e0d;
+  --color-panel: #181716;
+  --color-panel-2: #201f1d;
+  --color-line: #34322e;
+  --color-silver: #d4cbbf;
+  --color-silver-dim: #9a9186;
+  --color-olive: #8f8545;
+  --color-olive-light: #aea25a;
+  --color-gold: #c9a24a;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-exo), var(--font-inter), ui-sans-serif, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+  background-color: var(--color-ink);
+}
+
+body {
+  background-color: var(--color-ink);
+  background-image:
+    radial-gradient(1200px 600px at 85% -10%, rgb(201 162 74 / 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgb(143 133 69 / 0.08), transparent 60%);
+  background-attachment: fixed;
+  color: var(--color-silver);
+}
+
+/* Thin glowing arc, echoing the gold lines on the logo artwork. */
+.gold-arc {
+  position: absolute;
+  border-radius: 50%;
+  border-top: 1px solid rgb(201 162 74 / 0.55);
+  box-shadow: 0 -1px 18px -6px rgb(201 162 74 / 0.6);
+  pointer-events: none;
+}
+
+.metal-text {
+  background: linear-gradient(180deg, #ece5da 0%, #b9afa2 55%, #8c8377 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.olive-text {
+  background: linear-gradient(180deg, #c3b66a 0%, #8f8545 60%, #6c6433 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
