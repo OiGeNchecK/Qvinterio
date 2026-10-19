@@ -3,8 +3,8 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { getDictionary } from "@/i18n";
 import { LoginForm } from "./login-form";
 
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const [{ t }, { next }] = await Promise.all([getDictionary(), searchParams]);
+export default async function LoginPage({ params }: PageProps<"/[locale]/login">) {
+  const { locale, t } = getDictionary((await params).locale);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
@@ -14,13 +14,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       </div>
       <div className="relative w-full max-w-sm rounded-3xl border border-line bg-panel/90 p-8 shadow-2xl">
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
-          <Logo size={56} />
+          <Logo href={`/${locale}/`} size={56} />
           <div>
             <h1 className="font-display text-2xl text-white">{t.login.title}</h1>
             <p className="mt-1 text-sm text-silver-dim">{t.login.subtitle}</p>
           </div>
         </div>
-        <LoginForm labels={t.login} next={typeof next === "string" ? next : undefined} />
+        <LoginForm locale={locale} labels={t.login} />
       </div>
     </div>
   );

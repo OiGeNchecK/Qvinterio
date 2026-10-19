@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
+import { asset } from "@/lib/paths";
 
-export function Logo({ href = "/", size = 36 }: { href?: string; size?: number }) {
+export function Logo({ href, size = 36 }: { href: string; size?: number }) {
   return (
     <Link href={href} className="flex items-center gap-3" aria-label="Qvinterio">
       <Image
-        src="/brand/emblem.webp"
+        src={asset("/brand/emblem.webp")}
         alt=""
         width={size}
         height={size}

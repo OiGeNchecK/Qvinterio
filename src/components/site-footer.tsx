@@ -1,8 +1,7 @@
-import { getDictionary } from "@/i18n";
+import type { Dictionary } from "@/i18n";
 import { company } from "@/content/company";
 
-export async function SiteFooter() {
-  const { t } = await getDictionary();
+export function SiteFooter({ t }: { t: Dictionary }) {
   return (
     <footer id="contact" className="relative z-10 border-t border-line">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-3">

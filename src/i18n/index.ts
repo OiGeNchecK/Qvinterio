@@ -1,5 +1,3 @@
-import "server-only";
-import { cookies } from "next/headers";
 import de from "./de";
 import uk from "./uk";
 
@@ -8,7 +6,6 @@ import uk from "./uk";
 export const LOCALES = ["de", "uk"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "de";
-export const LOCALE_COOKIE = "locale";
 
 const dictionaries = { de, uk };
 
@@ -16,12 +13,13 @@ export function isLocale(value: unknown): value is Locale {
   return LOCALES.includes(value as Locale);
 }
 
-export async function getLocale(): Promise<Locale> {
-  const value = (await cookies()).get(LOCALE_COOKIE)?.value;
-  return isLocale(value) ? value : DEFAULT_LOCALE;
+export function getDictionary(locale: string) {
+  const l = isLocale(locale) ? locale : DEFAULT_LOCALE;
+  return { locale: l, t: dictionaries[l] };
 }
 
-export async function getDictionary() {
-  const locale = await getLocale();
-  return { locale, t: dictionaries[locale] };
+export function dateLocale(locale: Locale) {
+  return locale === "uk" ? "uk-UA" : "de-DE";
 }
+
+export type { Dictionary } from "./de";

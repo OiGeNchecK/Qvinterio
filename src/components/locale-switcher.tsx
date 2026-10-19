@@ -1,23 +1,27 @@
-import { getLocale, LOCALES } from "@/i18n";
-import { setLocale } from "@/i18n/actions";
+"use client";
 
-export async function LocaleSwitcher() {
-  const current = await getLocale();
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LOCALES } from "@/i18n";
+
+// Swaps the first path segment (/de/... ↔ /uk/...).
+export function LocaleSwitcher() {
+  const pathname = usePathname();
+  const [, current, ...rest] = pathname.split("/");
   return (
-    <form action={setLocale} className="flex rounded-full border border-line p-0.5 text-xs">
+    <div className="flex rounded-full border border-line p-0.5 text-xs">
       {LOCALES.map((locale) => (
-        <button
+        <Link
           key={locale}
-          name="locale"
-          value={locale}
-          aria-pressed={locale === current}
+          href={["", locale, ...rest].join("/") || `/${locale}/`}
+          aria-current={locale === current ? "true" : undefined}
           className={`rounded-full px-2.5 py-1 uppercase transition ${
             locale === current ? "bg-olive text-ink" : "text-silver-dim hover:text-silver"
           }`}
         >
           {locale === "uk" ? "UA" : locale}
-        </button>
+        </Link>
       ))}
-    </form>
+    </div>
   );
 }

@@ -5,26 +5,33 @@ import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
-import { getProject } from "@/content/projects";
+import { getProject, projects } from "@/content/projects";
 
-export async function generateMetadata({ params }: PageProps<"/projekte/[slug]">): Promise<Metadata> {
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return projects.map((p) => ({ slug: p.slug }));
+}
+
+export async function generateMetadata({ params }: PageProps<"/[locale]/projekte/[slug]">): Promise<Metadata> {
   const project = getProject((await params).slug);
   return project ? { title: `${project.city}, ${project.title} – Qvinterio`, description: project.summary } : {};
 }
 
-export default async function ProjectPage({ params }: PageProps<"/projekte/[slug]">) {
-  const project = getProject((await params).slug);
+export default async function ProjectPage({ params }: PageProps<"/[locale]/projekte/[slug]">) {
+  const { slug, locale: l } = await params;
+  const project = getProject(slug);
   if (!project) notFound();
-  const { t } = await getDictionary();
+  const { locale, t } = getDictionary(l);
 
   return (
     <div className="relative overflow-hidden">
-      <SiteHeader />
+      <SiteHeader locale={locale} t={t} />
       <article className="relative z-10 mx-auto max-w-7xl px-4 pb-20 pt-6">
-        <Link href="/#works" className="text-sm text-silver-dim hover:text-silver">← {t.project.back}</Link>
+        <Link href={`/${locale}/#works`} className="text-sm text-silver-dim hover:text-silver">← {t.project.back}</Link>
         <div className="mt-6 grid gap-10 lg:grid-cols-[3fr_2fr]">
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-panel-2">
-            <Image src={project.cover} alt={project.title} fill unoptimized priority className="text-transparent object-cover" />
+            <Image src={project.cover} alt={project.title} fill priority className="text-transparent object-cover" />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-olive-light">{project.city}</p>
@@ -57,14 +64,14 @@ export default async function ProjectPage({ params }: PageProps<"/projekte/[slug
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {project.gallery.map((src) => (
                 <div key={src} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line bg-panel-2">
-                  <Image src={src} alt="" fill unoptimized className="text-transparent object-cover" />
+                  <Image src={src} alt="" fill className="text-transparent object-cover" />
                 </div>
               ))}
             </div>
           </section>
         )}
       </article>
-      <SiteFooter />
+      <SiteFooter t={t} />
     </div>
   );
 }

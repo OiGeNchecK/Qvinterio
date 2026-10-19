@@ -4,7 +4,8 @@
 
 ## Технології
 
-- [Next.js 16](https://nextjs.org) (App Router, TypeScript), Tailwind CSS 4
+- [Next.js 16](https://nextjs.org) (App Router, TypeScript), Tailwind CSS 4, статичний експорт
+- Хостинг: GitHub Pages (`.github/workflows/pages.yml`), автодеплой після кожного пушу
 - [Supabase](https://supabase.com): PostgreSQL, вхід користувачів, сховище фото
 - Мови інтерфейсу: німецька (основна) і українська (тимчасово, див. `src/i18n`)
 
@@ -12,12 +13,14 @@
 
 | Шлях | Що там |
 |---|---|
-| `src/app/page.tsx` | Головна сторінка (портфоліо, послуги, контакти) |
-| `src/app/login` | Вхід |
-| `src/app/admin` | Адмін-панель (адмін і бауляйтер) |
-| `src/app/worker` | Панель працівника |
-| `src/app/client` | Кабінет замовника: етапи і фото його будови |
-| `src/lib/auth.ts` | Поточний користувач і перевірка ролей |
+| `src/app/[locale]/page.tsx` | Головна сторінка (`/de/`, `/uk/`) |
+| `src/app/[locale]/projekte` | Сторінки проєктів |
+| `src/app/[locale]/login` | Вхід |
+| `src/app/[locale]/admin` | Адмін-панель (адмін і бауляйтер) |
+| `src/app/[locale]/worker` | Панель працівника |
+| `src/app/[locale]/client` | Кабінет замовника: етапи і фото його будови |
+| `src/content` | Тексти фірми і проєкти з qvinterio.de |
+| `src/lib/auth.tsx` | Поточний користувач і перевірка ролей (у браузері) |
 | `src/i18n` | Переклади DE / UK |
 | `supabase/migrations` | Схема бази, права доступу (RLS), бакети для фото |
 
@@ -30,7 +33,7 @@
    npm install
    npm run dev
    ```
-5. Відкрийте http://localhost:3000.
+5. Відкрийте http://localhost:3000/de/.
 
 Без Supabase головна сторінка теж відкривається, але вхід не працює.
 
@@ -42,6 +45,17 @@
 insert into public.user_roles (user_id, role)
 select id, 'admin' from auth.users where email = 'ваш@email';
 ```
+
+## GitHub Pages
+
+Сайт збирається як статичні файли, тому вся робота з даними йде з браузера напряму в Supabase.
+Захист даних забезпечують правила RLS у базі, а не сервер.
+
+Налаштування один раз:
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Settings → Secrets and variables → Actions → Variables: `NEXT_PUBLIC_SUPABASE_URL` і `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (це публічні значення).
+
+Адреса сайту: https://oigencheck.github.io/Qvinterio/
 
 ## Ролі
 
