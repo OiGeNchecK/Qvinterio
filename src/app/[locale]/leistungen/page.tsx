@@ -65,7 +65,7 @@ export default async function LeistungenPage({ params }: PageProps<"/[locale]/le
                           alt={service.photo.alt}
                           width={service.photo.width}
                           height={service.photo.height}
-                          sizes="(min-width: 1024px) 600px, (min-width: 768px) 50vw, 100vw"
+                          sizes="(min-width: 768px) 420px, 78vw"
                           loading="lazy"
                           className="lp-photo"
                         />
