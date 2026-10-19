@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { SiteBackground } from "@/components/site-background";
 import type { Dictionary, Locale } from "@/i18n";
 import { LoginForm } from "./login-form";
 
@@ -30,10 +31,10 @@ export function LoginDialog({ locale, t }: { locale: Locale; t: Dictionary }) {
 
   return (
     <div
-      className="relative flex min-h-screen cursor-pointer items-center justify-center overflow-hidden bg-ink/90 px-4 backdrop-blur"
+      className="relative flex min-h-screen cursor-pointer items-center justify-center overflow-hidden px-4"
       onClick={(e) => e.target === e.currentTarget && router.push(`/${locale}/`)}
     >
-      <div className="gold-arc pointer-events-none -left-1/2 top-1/3 h-[60rem] w-[200%] -rotate-6" />
+      <SiteBackground focus="center" />
       <div className="absolute right-4 top-4">
         <LocaleSwitcher />
       </div>
@@ -41,7 +42,7 @@ export function LoginDialog({ locale, t }: { locale: Locale; t: Dictionary }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="login-title"
-        className="relative w-full max-w-sm cursor-auto rounded-3xl border border-line bg-panel/95 p-8 shadow-2xl"
+        className="relative w-full max-w-sm cursor-auto rounded-3xl border border-line bg-panel/90 p-8 shadow-2xl backdrop-blur-sm"
       >
         <button
           type="button"

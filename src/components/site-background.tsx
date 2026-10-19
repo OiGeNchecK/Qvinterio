@@ -13,7 +13,7 @@ function subscribe(onChange: () => void) {
 
 // Grid Scan room behind the whole page in the QV palette. It never takes
 // clicks; a static CSS grid shows instead when WebGL2 is unavailable.
-export function SiteBackground() {
+export function SiteBackground({ focus = "left" }: { focus?: "left" | "center" }) {
   const mobile = useSyncExternalStore(
     subscribe,
     () => window.matchMedia(MOBILE_QUERY).matches,
@@ -44,8 +44,14 @@ export function SiteBackground() {
         dpr={mobile ? 1 : 1.5}
       />
       {/* Darken behind the text so it stays readable. */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_25%_40%,rgb(17_17_16/0.85),rgb(17_17_16/0.4)_60%,transparent_85%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(17_17_16/0.6),transparent_55%)]" />
+      {focus === "left" ? (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_25%_40%,rgb(17_17_16/0.85),rgb(17_17_16/0.4)_60%,transparent_85%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(17_17_16/0.6),transparent_55%)]" />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_32%_45%_at_50%_50%,rgb(17_17_16/0.7),rgb(17_17_16/0.25)_65%,transparent_100%)]" />
+      )}
     </div>
   );
 }
