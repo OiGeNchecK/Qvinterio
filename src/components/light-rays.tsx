@@ -13,6 +13,8 @@ type Props = {
   origin?: [number, number];
   /** Direction the rays point to (screen space, y down). */
   direction?: [number, number];
+  /** Half-angle of the light cone in degrees. */
+  coneAngle?: number;
   speed?: number;
   intensity?: number;
   mobileIntensity?: number;
@@ -41,6 +43,7 @@ uniform float rayLength;
 uniform float intensity;
 uniform vec2 mousePos;
 uniform float mouseInfluence;
+uniform float coneCos;
 
 float rayStrength(vec2 source, vec2 refDir, vec2 coord, float seedA, float seedB, float speed) {
   vec2 toCoord = coord - source;
@@ -67,15 +70,18 @@ void main() {
   float r1 = rayStrength(rayPos, dir, coord, 36.2214, 21.11349, 1.5 * raysSpeed);
   float r2 = rayStrength(rayPos, dir, coord, 22.3991, 18.0234, 1.1 * raysSpeed);
   float rays = r1 * 0.5 + r2 * 0.4;
-  // Fade towards the bottom so the section blends into the page.
-  float fade = 1.0 - coord.y / iResolution.y;
-  rays *= 0.25 + fade * 0.75;
+  // Clip the light to a cone so it reads as the "V" of the logo.
+  float c = dot(normalize(coord - rayPos), dir);
+  rays *= smoothstep(coneCos - 0.06, coneCos + 0.02, c);
+  // Soften the hot spot at the tip of the V.
+  rays *= 0.35 + 0.65 * smoothstep(0.0, 0.45 * iResolution.y, length(coord - rayPos));
   gl_FragColor = vec4(bgColor + raysColor * rays * intensity, 1.0);
 }
 `;
 
-const DEFAULT_ORIGIN: [number, number] = [0.82, -0.25];
-const DEFAULT_DIRECTION: [number, number] = [-0.3, 1];
+// Bottom centre, shining up: the cone opens into a "V".
+const DEFAULT_ORIGIN: [number, number] = [0.5, 1.05];
+const DEFAULT_DIRECTION: [number, number] = [0, -1];
 
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.replace("#", ""), 16);
@@ -87,11 +93,12 @@ export function LightRays({
   raysColor = "#D4E88B",
   origin = DEFAULT_ORIGIN,
   direction = DEFAULT_DIRECTION,
+  coneAngle = 30,
   speed = 0.35,
-  intensity = 0.45,
-  mobileIntensity = 0.28,
-  lightSpread = 0.9,
-  rayLength = 1.6,
+  intensity = 0.3,
+  mobileIntensity = 0.2,
+  lightSpread = 1.4,
+  rayLength = 1.5,
   mouseInfluence = 0.06,
   className = "",
 }: Props) {
@@ -133,7 +140,7 @@ export function LightRays({
     gl.uniform3fv(u("bgColor"), hexToRgb(background));
     gl.uniform1f(u("raysSpeed"), speed);
     gl.uniform1f(u("lightSpread"), lightSpread);
-    gl.uniform1f(u("rayLength"), rayLength);
+    gl.uniform1f(u("coneCos"), Math.cos((coneAngle * Math.PI) / 180));
     gl.uniform1f(u("intensity"), mobile ? mobileIntensity : intensity);
     const influence = reduceMotion || mobile ? 0 : mouseInfluence;
     gl.uniform1f(u("mouseInfluence"), influence);
@@ -146,6 +153,8 @@ export function LightRays({
       gl.viewport(0, 0, w, h);
       gl.uniform2f(u("iResolution"), w, h);
       gl.uniform2f(u("rayPos"), origin[0] * w, origin[1] * h);
+      // Ray length follows the taller side so the V reaches the top on phones too.
+      gl.uniform1f(u("rayLength"), (rayLength * Math.max(w, h)) / w);
     };
     resize();
 
@@ -185,7 +194,7 @@ export function LightRays({
       return () => ro.disconnect();
     }
 
-    // Only animate while the first screen is on screen.
+    // Pause while the canvas is hidden.
     const io = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
       cancelAnimationFrame(frame);
@@ -200,7 +209,7 @@ export function LightRays({
       ro.disconnect();
       window.removeEventListener("pointermove", onMove);
     };
-  }, [background, raysColor, origin, direction, speed, intensity, mobileIntensity, lightSpread, rayLength, mouseInfluence]);
+  }, [background, raysColor, origin, direction, coneAngle, speed, intensity, mobileIntensity, lightSpread, rayLength, mouseInfluence]);
 
   return <canvas ref={canvasRef} aria-hidden className={`block h-full w-full ${className}`} />;
 }

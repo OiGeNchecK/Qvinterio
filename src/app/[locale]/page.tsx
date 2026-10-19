@@ -13,15 +13,13 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
   return (
     <div className="relative overflow-hidden">
+      {/* Light rays behind the whole page, fixed to the viewport. */}
+      <div className="fixed inset-0">
+        <LightRays />
+      </div>
       <div className="gold-arc -right-[40%] top-[70rem] h-[50rem] w-[140%] rotate-[8deg]" />
 
-      {/* First screen: light rays behind the emblem, darkened on the left for the text. */}
-      <div className="relative overflow-hidden bg-graphite">
-        <div className="absolute inset-0">
-          <LightRays />
-        </div>
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--color-graphite)_0%,rgb(17_23_21/0.85)_30%,rgb(17_23_21/0.35)_55%,transparent_75%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-ink" />
+      <div className="relative">
         <div className="gold-arc -left-[30%] top-[18rem] h-[60rem] w-[160%] -rotate-6 opacity-60" />
 
         <SiteHeader locale={locale} t={t} />
