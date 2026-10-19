@@ -11,7 +11,7 @@ export function RedirectToLocale() {
   }, []);
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <Link href={`/${DEFAULT_LOCALE}/`} className="text-olive-light">Qvinterio →</Link>
+      <Link href={`/${DEFAULT_LOCALE}/`} className="text-olive">Qvinterio →</Link>
     </div>
   );
 }

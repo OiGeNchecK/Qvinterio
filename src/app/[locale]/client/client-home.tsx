@@ -102,7 +102,7 @@ export function ClientHome({ locale, t }: { locale: Locale; t: Dictionary }) {
       <Card className="space-y-3">
         <div className="flex justify-between text-sm">
           <span>{t.common.progress}</span>
-          <span className="text-olive-light">{progress}%</span>
+          <span className="text-olive">{progress}%</span>
         </div>
         <ProgressBar value={progress} />
       </Card>

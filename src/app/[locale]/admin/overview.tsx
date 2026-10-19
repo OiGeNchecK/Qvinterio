@@ -46,7 +46,7 @@ export function AdminOverview({ locale, t }: { locale: Locale; t: Dictionary }) 
       <div className="grid gap-5 sm:grid-cols-2">
         <Card>
           <div className="text-sm text-silver-dim">{t.admin.newOrders}</div>
-          <div className="mt-2 font-display text-4xl text-olive-light">{data?.newOrders ?? "–"}</div>
+          <div className="mt-2 font-display text-4xl text-olive">{data?.newOrders ?? "–"}</div>
         </Card>
         <Card>
           <div className="text-sm text-silver-dim">{t.admin.activeProjects}</div>

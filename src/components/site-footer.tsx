@@ -10,7 +10,7 @@ export function SiteFooter({ t }: { t: Dictionary }) {
           <p className="mt-2 text-sm text-silver-dim">{t.home.contactText}</p>
         </div>
         <div className="space-y-1 text-sm">
-          <div className="text-xs uppercase tracking-widest text-olive-light">{t.home.contactPerson}</div>
+          <div className="text-xs uppercase tracking-widest text-olive">{t.home.contactPerson}</div>
           <div className="text-white">{company.contactPerson}</div>
           <a href={`tel:${company.phone.replace(/\s/g, "")}`} className="block hover:text-white">{company.phone}</a>
           <a href={`mailto:${company.email}`} className="block hover:text-white">{company.email}</a>
@@ -19,7 +19,7 @@ export function SiteFooter({ t }: { t: Dictionary }) {
           </a>
         </div>
         <div className="space-y-3 text-sm">
-          <div className="text-xs uppercase tracking-widest text-olive-light">{t.home.locations}</div>
+          <div className="text-xs uppercase tracking-widest text-olive">{t.home.locations}</div>
           {company.locations.map((l) => (
             <div key={l.city}>
               <div className="text-white">{l.city}</div>

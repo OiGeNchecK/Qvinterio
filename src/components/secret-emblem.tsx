@@ -25,18 +25,26 @@ export function SecretEmblem({ locale }: { locale: string }) {
   return (
     <div
       onClick={onTap}
-      className="relative mx-auto aspect-square w-full max-w-md select-none rounded-full [-webkit-tap-highlight-color:transparent]"
+      className="relative mx-auto aspect-square w-full max-w-md select-none [-webkit-tap-highlight-color:transparent] [perspective:1200px]"
     >
-      <div className="absolute inset-0 rounded-full bg-gold/10 blur-3xl" />
-      <Image
-        src={asset("/brand/emblem.webp")}
-        alt="Qvinterio"
-        fill
-        sizes="(min-width: 1024px) 28rem, 80vw"
-        draggable={false}
-        className="rounded-full object-cover ring-1 ring-line"
-        priority
-      />
+      {/* Soft shadow under the coin. */}
+      <div className="absolute inset-x-[12%] -bottom-[6%] h-[12%] rounded-full bg-black/70 blur-2xl" />
+      <div className="coin absolute inset-0 rounded-full">
+        {/* Reeded metal rim. */}
+        <div className="coin-rim absolute inset-0 rounded-full" />
+        <div className="absolute inset-[5%] overflow-hidden rounded-full shadow-[inset_0_0_0_1px_rgb(0_0_0/0.6),0_0_0_1px_rgb(238_232_222/0.15)]">
+          <Image
+            src={asset("/brand/emblem.webp")}
+            alt="Qvinterio"
+            fill
+            sizes="(min-width: 1024px) 28rem, 80vw"
+            draggable={false}
+            className="scale-[1.04] object-cover"
+            priority
+          />
+          <div className="coin-sheen absolute inset-0" />
+        </div>
+      </div>
     </div>
   );
 }

@@ -26,7 +26,7 @@ export function Dashboard({ locale, t }: { locale: Locale; t: Dictionary }) {
       <p className="max-w-md text-silver-dim">{t.common.noRole}</p>
       <button
         onClick={() => createClient().auth.signOut()}
-        className="text-sm text-olive-light hover:underline"
+        className="text-sm text-olive hover:underline"
       >
         {t.nav.logout}
       </button>

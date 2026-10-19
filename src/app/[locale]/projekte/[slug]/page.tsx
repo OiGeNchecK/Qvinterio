@@ -34,7 +34,7 @@ export default async function ProjectPage({ params }: PageProps<"/[locale]/proje
             <Image src={project.cover} alt={project.title} fill priority className="text-transparent object-cover" />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-olive-light">{project.city}</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-olive">{project.city}</p>
             <h1 className="mt-3 font-display text-4xl text-white">{project.title}</h1>
             <p className="mt-5 text-silver-dim">{project.summary}</p>
             <dl className="mt-8 grid grid-cols-2 gap-4 text-sm">
@@ -47,7 +47,7 @@ export default async function ProjectPage({ params }: PageProps<"/[locale]/proje
                 <dd className="mt-1 text-white">{project.client}</dd>
               </div>
             </dl>
-            <h2 className="mt-8 text-sm uppercase tracking-widest text-olive-light">{t.project.services}</h2>
+            <h2 className="mt-8 text-sm uppercase tracking-widest text-olive">{t.project.services}</h2>
             <ul className="mt-3 space-y-2 text-sm">
               {project.services.map((s) => (
                 <li key={s} className="flex gap-3">

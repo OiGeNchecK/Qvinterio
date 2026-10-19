@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/button";
 import { SecretEmblem } from "@/components/secret-emblem";
-import { LightRays } from "@/components/light-rays";
+import { Threads } from "@/components/threads";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
@@ -13,20 +13,17 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
   return (
     <div className="relative overflow-hidden">
-      {/* Light rays behind the whole page, fixed to the viewport. */}
+      {/* Gold threads behind the whole page, fixed to the viewport. */}
       <div className="fixed inset-0">
-        <LightRays />
+        <Threads />
       </div>
-      <div className="gold-arc -right-[40%] top-[70rem] h-[50rem] w-[140%] rotate-[8deg]" />
 
       <div className="relative">
-        <div className="gold-arc -left-[30%] top-[18rem] h-[60rem] w-[160%] -rotate-6 opacity-60" />
-
         <SiteHeader locale={locale} t={t} />
 
         <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-10 lg:grid-cols-[3fr_2fr] lg:pt-16">
           <div>
-            <p className="mb-5 text-xs uppercase tracking-[0.3em] text-olive-light">{t.home.eyebrow}</p>
+            <p className="mb-5 text-xs uppercase tracking-[0.3em] text-olive">{t.home.eyebrow}</p>
             <h1 className="font-display text-4xl font-semibold leading-tight text-white sm:text-5xl xl:text-6xl">
               <span className="block sm:whitespace-nowrap">{t.home.title}</span>
               <span className="block olive-text">{t.home.title2}</span>
@@ -46,7 +43,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         <div className="grid gap-5 md:grid-cols-3">
           {t.home.values.map((v, i) => (
             <div key={v.title} className="rounded-2xl border border-line bg-panel/70 p-6">
-              <div className="font-display text-sm text-olive-light">0{i + 1}</div>
+              <div className="font-display text-sm text-olive">0{i + 1}</div>
               <h3 className="mt-3 text-lg font-medium text-white">{v.title}</h3>
               <p className="mt-2 text-sm text-silver-dim">{v.text}</p>
             </div>
@@ -77,7 +74,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
                   <h3 className="font-medium text-white">{p.title}</h3>
                   <p className="text-xs text-silver-dim">{p.city}</p>
                 </div>
-                <span className="text-xs text-olive-light">{p.area}</span>
+                <span className="text-xs text-olive">{p.area}</span>
               </div>
             </Link>
           ))}
