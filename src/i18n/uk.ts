@@ -73,6 +73,12 @@ const uk: Dictionary = {
     error: "Неправильний e-mail або пароль.",
     notConfigured: "Вхід ще не налаштовано.",
   },
+  legal: {
+    imprint: "Impressum",
+    privacy: "Захист даних",
+    back: "На головну",
+    germanOnly: "Юридичні тексти доступні лише німецькою мовою.",
+  },
   roles: {
     admin: "Адміністратор",
     manager: "Бауляйтер",

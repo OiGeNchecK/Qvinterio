@@ -1,7 +1,8 @@
-import type { Dictionary } from "@/i18n";
+import Link from "next/link";
+import type { Dictionary, Locale } from "@/i18n";
 import { company } from "@/content/company";
 
-export function SiteFooter({ t }: { t: Dictionary }) {
+export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
   return (
     <footer id="contact" className="relative z-10 border-t border-line">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-3">
@@ -28,8 +29,14 @@ export function SiteFooter({ t }: { t: Dictionary }) {
           ))}
         </div>
       </div>
-      <div className="border-t border-line py-5 text-center text-xs text-silver-dim">
-        © {new Date().getFullYear()} {company.name}
+      <div className="border-t border-line">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-silver-dim sm:flex-row">
+          <span>© {new Date().getFullYear()} {company.name}</span>
+          <nav className="flex gap-6">
+            <Link href={`/${locale}/impressum/`} className="hover:text-white">{t.legal.imprint}</Link>
+            <Link href={`/${locale}/datenschutz/`} className="hover:text-white">{t.legal.privacy}</Link>
+          </nav>
+        </div>
       </div>
     </footer>
   );

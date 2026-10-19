@@ -98,7 +98,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </div>
       </section>
 
-      <SiteFooter t={t} />
+      <SiteFooter locale={locale} t={t} />
     </div>
   );
 }

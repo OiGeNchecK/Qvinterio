@@ -71,7 +71,7 @@ export default async function ProjectPage({ params }: PageProps<"/[locale]/proje
           </section>
         )}
       </article>
-      <SiteFooter t={t} />
+      <SiteFooter locale={locale} t={t} />
     </div>
   );
 }

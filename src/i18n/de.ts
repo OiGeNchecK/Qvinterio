@@ -71,6 +71,12 @@ const de = {
     error: "E-Mail oder Passwort ist falsch.",
     notConfigured: "Die Anmeldung ist noch nicht eingerichtet.",
   },
+  legal: {
+    imprint: "Impressum",
+    privacy: "Datenschutz",
+    back: "Zur Startseite",
+    germanOnly: "",
+  },
   roles: {
     admin: "Administrator",
     manager: "Bauleiter",
