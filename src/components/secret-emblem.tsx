@@ -30,9 +30,7 @@ export function SecretEmblem({ locale }: { locale: string }) {
       {/* Soft shadow under the coin. */}
       <div className="absolute inset-x-[12%] -bottom-[6%] h-[12%] rounded-full bg-black/70 blur-2xl" />
       <div className="coin absolute inset-0 rounded-full">
-        {/* Reeded metal rim. */}
-        <div className="coin-rim absolute inset-0 rounded-full" />
-        <div className="absolute inset-[5%] overflow-hidden rounded-full shadow-[inset_0_0_0_1px_rgb(0_0_0/0.6),0_0_0_1px_rgb(238_232_222/0.15)]">
+        <div className="absolute inset-0 overflow-hidden rounded-full">
           <Image
             src={asset("/brand/emblem.webp")}
             alt="Qvinterio"
