@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { AppRole } from "@/lib/auth";
-import { must } from "./kit";
+import { must, type Tone } from "./kit";
 
 export type ProjectStatus = "planned" | "active" | "paused" | "done";
 export type StageStatus = "pending" | "in_progress" | "done";
@@ -62,3 +62,17 @@ export async function loadProjectRefs(): Promise<ProjectRef[]> {
 }
 
 export const isStaffPerson = (p: Person) => p.active && (p.roles.includes("admin") || p.roles.includes("manager"));
+
+const ORDER_TONES: Record<OrderStatus, Tone> = {
+  new: "amber",
+  in_progress: "sky",
+  ordered: "olive",
+  delivered: "green",
+  cancelled: "red",
+};
+const PROJECT_TONES: Record<ProjectStatus, Tone> = { planned: "sky", active: "green", paused: "amber", done: "gray" };
+const STAGE_TONES: Record<StageStatus, Tone> = { pending: "gray", in_progress: "sky", done: "green" };
+
+export const orderStatusTone = (s: OrderStatus) => ORDER_TONES[s];
+export const projectStatusTone = (s: ProjectStatus) => PROJECT_TONES[s];
+export const stageStatusTone = (s: StageStatus) => STAGE_TONES[s];

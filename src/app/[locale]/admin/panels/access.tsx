@@ -1,12 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@/components/ui";
+import { Ban, CalendarPlus, Plus } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import { dateLocale, type Dictionary, type Locale } from "@/i18n";
-import { Badge, Empty, ErrorNote, Field, Input, SectionHeader, Select, must, useLoad } from "../kit";
-import { loadPeople, loadProjectRefs, personName } from "../data";
+import {
+  Badge,
+  EmptyRow,
+  ErrorNote,
+  Field,
+  IconButton,
+  Input,
+  Modal,
+  ModalActions,
+  Panel,
+  SectionHeader,
+  Select,
+  Table,
+  must,
+  useLoad,
+} from "../kit";
+import { loadPeople, loadProjectRefs, personName, type Person, type ProjectRef } from "../data";
 
 type Grant = {
   id: string;
@@ -43,13 +58,12 @@ async function loadAll() {
 export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) {
   const a = t.adminUi;
   const { data, error, reload } = useLoad(loadAll);
-  const [form, setForm] = useState({ client_id: "", project_id: "", until: inDays(30) });
+  const [granting, setGranting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const dateFormat = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium" });
 
   const people = new Map(data?.people.map((p) => [p.id, p]));
   const projects = new Map(data?.projects.map((p) => [p.id, p.name]));
-  const clients = data?.people.filter((p) => p.active && p.roles.includes("client")) ?? [];
 
   async function run(action: PromiseLike<{ error: { message: string } | null }>) {
     const { error } = await action;
@@ -57,112 +71,145 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
     reload();
   }
 
-  function grant() {
-    if (!form.client_id || !form.project_id || !form.until) return setActionError(a.fillAll);
+  // Called from a click handler, so reading the clock here is fine.
+  const extend = (g: Grant, now: number) =>
     run(
-      createClient().from("client_access").insert({
-        client_id: form.client_id,
-        project_id: form.project_id,
-        expires_at: endOfDay(form.until),
-      }),
+      createClient()
+        .from("client_access")
+        .update({
+          revoked_at: null,
+          expires_at: new Date(Math.max(now, +new Date(g.expires_at)) + 30 * DAY).toISOString(),
+        })
+        .eq("id", g.id),
     );
+
+  const revoke = (g: Grant) =>
+    run(createClient().from("client_access").update({ revoked_at: new Date().toISOString() }).eq("id", g.id));
+
+  return (
+    <div>
+      <SectionHeader title={t.admin.sections.access}>
+        <Button onClick={() => setGranting(true)}>
+          <Plus size={16} /> {a.grantAccess}
+        </Button>
+      </SectionHeader>
+      <ErrorNote error={error ?? actionError} />
+
+      <Panel>
+        <Table head={[t.roles.client, a.site, t.client.validUntil, a.status, ""]}>
+          {data?.grants.map((g) => {
+            const active = !g.revoked_at && new Date(g.expires_at) > new Date();
+            return (
+              <tr key={g.id}>
+                <td className="font-medium text-white">{personName(people.get(g.client_id))}</td>
+                <td className="text-silver">{projects.get(g.project_id)}</td>
+                <td className="whitespace-nowrap text-silver-dim">{dateFormat.format(new Date(g.expires_at))}</td>
+                <td>
+                  <Badge tone={g.revoked_at ? "red" : active ? "green" : "gray"}>
+                    {g.revoked_at ? a.revoked : active ? a.active : a.expired}
+                  </Badge>
+                </td>
+                <td>
+                  <div className="flex justify-end gap-1.5">
+                    <IconButton onClick={() => extend(g, Date.now())} title={a.extend30}>
+                      <CalendarPlus size={14} />
+                    </IconButton>
+                    {active && (
+                      <IconButton danger onClick={() => revoke(g)} title={a.revoke}>
+                        <Ban size={14} />
+                      </IconButton>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+          {data && !data.grants.length && <EmptyRow cols={5}>{a.noGrants}</EmptyRow>}
+        </Table>
+      </Panel>
+
+      {granting && data && (
+        <GrantModal
+          t={t}
+          clients={data.people.filter((p) => p.active && p.roles.includes("client"))}
+          projects={data.projects}
+          onClose={() => setGranting(false)}
+          onSaved={reload}
+        />
+      )}
+    </div>
+  );
+}
+
+function GrantModal({
+  t,
+  clients,
+  projects,
+  onClose,
+  onSaved,
+}: {
+  t: Dictionary;
+  clients: Person[];
+  projects: ProjectRef[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const a = t.adminUi;
+  const [form, setForm] = useState({ client_id: "", project_id: "", until: inDays(30) });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!form.client_id || !form.project_id || !form.until) return setError(a.fillAll);
+    setBusy(true);
+    const { error } = await createClient().from("client_access").insert({
+      client_id: form.client_id,
+      project_id: form.project_id,
+      expires_at: endOfDay(form.until),
+    });
+    setBusy(false);
+    if (error) return setError(error.message);
+    onSaved();
+    onClose();
   }
 
   return (
-    <div className="space-y-6">
-      <SectionHeader title={t.admin.sections.access} />
-      <ErrorNote error={error ?? actionError} />
-
-      <Card className="space-y-4">
-        <h2 className="font-medium text-white">{a.grantAccess}</h2>
-        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_12rem_auto] sm:items-end">
-          <Field label={t.roles.client}>
-            <Select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}>
-              <option value="">–</option>
-              {clients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {personName(p)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={a.site}>
-            <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
-              <option value="">–</option>
-              {data?.projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t.client.validUntil}>
-            <Input type="date" value={form.until} onChange={(e) => setForm({ ...form, until: e.target.value })} />
-          </Field>
-          <Button onClick={grant}>{a.grant}</Button>
-        </div>
+    <Modal title={a.grantAccess} onClose={onClose}>
+      <div className="space-y-4">
+        <Field label={t.roles.client}>
+          <Select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}>
+            <option value="">—</option>
+            {clients.map((p) => (
+              <option key={p.id} value={p.id}>
+                {personName(p)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={a.site}>
+          <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+            <option value="">—</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={t.client.validUntil}>
+          <Input type="date" value={form.until} onChange={(e) => setForm({ ...form, until: e.target.value })} />
+        </Field>
         <p className="text-xs text-silver-dim">{a.clientHint}</p>
-      </Card>
-
-      <Card className="p-0">
-        {data && !data.grants.length ? (
-          <Empty>{a.noGrants}</Empty>
-        ) : (
-          <ul className="divide-y divide-line">
-            {data?.grants.map((g) => {
-              const active = !g.revoked_at && new Date(g.expires_at) > new Date();
-              return (
-                <li
-                  key={g.id}
-                  className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[1.2fr_1.2fr_1fr_auto] sm:items-center"
-                >
-                  <span className="text-white">{personName(people.get(g.client_id))}</span>
-                  <span className="text-silver">{projects.get(g.project_id)}</span>
-                  <span className="flex items-center gap-2">
-                    <Badge tone={active ? "olive" : "dim"}>
-                      {g.revoked_at ? a.revoked : active ? a.active : a.expired}
-                    </Badge>
-                    <span className="text-xs text-silver-dim">{dateFormat.format(new Date(g.expires_at))}</span>
-                  </span>
-                  <span className="flex gap-3 text-xs">
-                    <button
-                      onClick={() =>
-                        run(
-                          createClient()
-                            .from("client_access")
-                            .update({
-                              revoked_at: null,
-                              expires_at: new Date(Math.max(Date.now(), +new Date(g.expires_at)) + 30 * DAY).toISOString(),
-                            })
-                            .eq("id", g.id),
-                        )
-                      }
-                      className="text-silver-dim hover:text-white"
-                    >
-                      {a.extend30}
-                    </button>
-                    {active && (
-                      <button
-                        onClick={() =>
-                          run(
-                            createClient()
-                              .from("client_access")
-                              .update({ revoked_at: new Date().toISOString() })
-                              .eq("id", g.id),
-                          )
-                        }
-                        className="text-silver-dim hover:text-red-300"
-                      >
-                        {a.revoke}
-                      </button>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-    </div>
+      </div>
+      <ErrorNote error={error} />
+      <ModalActions>
+        <Button variant="ghost" onClick={onClose}>
+          {a.cancel}
+        </Button>
+        <Button onClick={save} disabled={busy}>
+          {a.grant}
+        </Button>
+      </ModalActions>
+    </Modal>
   );
 }

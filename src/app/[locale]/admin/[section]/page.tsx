@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { Card } from "@/components/ui";
 import { getDictionary } from "@/i18n";
+import { Panel, SectionHeader } from "../kit";
 import { ADMIN_SECTIONS, type AdminSection } from "../sections";
 import { AccessSection } from "../panels/access";
 import { ContactsSection } from "../panels/contacts";
@@ -32,11 +32,11 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
       return <AccessSection locale={locale} t={t} />;
     default:
       return (
-        <div className="space-y-6">
-          <h1 className="font-display text-3xl text-white">{t.admin.sections[section as AdminSection]}</h1>
-          <Card>
+        <div>
+          <SectionHeader title={t.admin.sections[section as AdminSection]} />
+          <Panel>
             <p className="text-silver-dim">{t.common.comingSoon}</p>
-          </Card>
+          </Panel>
         </div>
       );
   }

@@ -1,22 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@/components/ui";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@/lib/auth";
 import { dateLocale, type Dictionary, type Locale } from "@/i18n";
-import { Badge, Empty, ErrorNote, Field, Input, SectionHeader, Select, Textarea, emptyToNull, must, toDateInput, useLoad } from "../kit";
+import {
+  EmptyRow,
+  ErrorNote,
+  Field,
+  IconButton,
+  Input,
+  Modal,
+  ModalActions,
+  Panel,
+  SectionHeader,
+  Select,
+  StatusMenu,
+  Table,
+  Textarea,
+  must,
+  toDateInput,
+  useLoad,
+} from "../kit";
 import {
   ORDER_STATUSES,
   isStaffPerson,
   loadPeople,
   loadProjectRefs,
+  orderStatusTone,
   personName,
   type OrderCategory,
   type OrderStatus,
+  type Person,
 } from "../data";
 
-type Order = {
+export type Order = {
   id: string;
   project_id: string;
   created_by: string | null;
@@ -35,22 +55,15 @@ type Order = {
 type OrderEvent = { id: number; actor_id: string | null; status: OrderStatus | null; note: string | null; created_at: string };
 type ContactRef = { id: string; company: string | null; person: string | null };
 
-const statusTone: Record<OrderStatus, "plain" | "olive" | "gold" | "dim"> = {
-  new: "gold",
-  in_progress: "olive",
-  ordered: "olive",
-  delivered: "plain",
-  cancelled: "dim",
-};
+export const ORDER_SELECT =
+  "id, project_id, created_by, assignee_id, contact_id, category, status, needed_by, delivery_date, note, created_at, projects(name), order_items(id, description, quantity, unit)";
 
 async function loadAll() {
   const supabase = createClient();
   const [orders, people, projects, contacts] = await Promise.all([
     supabase
       .from("orders")
-      .select(
-        "id, project_id, created_by, assignee_id, contact_id, category, status, needed_by, delivery_date, note, created_at, projects(name), order_items(id, description, quantity, unit)",
-      )
+      .select(ORDER_SELECT)
       .order("created_at", { ascending: false })
       .limit(500)
       .overrideTypes<Order[], { merge: false }>(),
@@ -76,18 +89,16 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   const [openId, setOpenId] = useState<string | null>(null);
   const a = t.adminUi;
 
-  const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium", timeStyle: "short" });
-  const people = new Map(data?.people.map((p) => [p.id, p]));
-
   const orders = (data?.orders ?? []).filter(
     (o) =>
       (!projectFilter || o.project_id === projectFilter) &&
       (!statusFilter ||
         (statusFilter === "open" ? !["delivered", "cancelled"].includes(o.status) : o.status === statusFilter)),
   );
+  const opened = data?.orders.find((o) => o.id === openId);
 
   return (
-    <div className="space-y-6">
+    <div>
       <SectionHeader title={t.admin.sections.orders}>
         <Select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="w-auto">
           <option value="">{a.allProjects}</option>
@@ -113,70 +124,150 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
       </SectionHeader>
       <ErrorNote error={error} />
 
-      <Card className="p-0">
-        {data && !orders.length ? (
-          <Empty>{t.admin.noOrders}</Empty>
-        ) : (
-          <ul className="divide-y divide-line">
-            {orders.map((o) => (
-              <li key={o.id}>
-                <button
-                  onClick={() => setOpenId(openId === o.id ? null : o.id)}
-                  className="grid w-full gap-2 px-5 py-4 text-left text-sm hover:bg-panel-2/60 sm:grid-cols-[1.2fr_1fr_1.6fr_auto] sm:items-center"
-                >
-                  <span>
-                    <span className="block text-white">{o.projects?.name}</span>
-                    <span className="text-xs text-silver-dim">{dateTime.format(new Date(o.created_at))}</span>
-                  </span>
-                  <span className="text-silver-dim">
-                    {t.orderCategory[o.category]} · {personName(people.get(o.created_by ?? ""))}
-                  </span>
-                  <span className="truncate text-silver-dim">
-                    {o.order_items.map((i) => `${i.quantity} ${i.unit} ${i.description}`).join(", ") || o.note}
-                  </span>
-                  <span className="flex items-center gap-2 sm:justify-end">
-                    <span className="text-xs text-silver-dim">→ {personName(people.get(o.assignee_id ?? ""))}</span>
-                    <Badge tone={statusTone[o.status]}>{t.orderStatus[o.status]}</Badge>
-                  </span>
-                </button>
-                {openId === o.id && data && (
-                  <OrderDetail
-                    order={o}
-                    t={t}
-                    dateTime={dateTime}
-                    dateFormatLocale={dateLocale(locale)}
-                    staff={data.people.filter(isStaffPerson)}
-                    people={people}
-                    contacts={data.contacts}
-                    onSaved={reload}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <Panel>
+        <OrdersTable
+          orders={orders}
+          people={data?.people ?? []}
+          locale={locale}
+          t={t}
+          onOpen={setOpenId}
+          onChanged={reload}
+          loaded={!!data}
+        />
+      </Panel>
+
+      {opened && data && (
+        <OrderModal
+          order={opened}
+          t={t}
+          locale={locale}
+          people={data.people}
+          contacts={data.contacts}
+          onClose={() => setOpenId(null)}
+          onSaved={reload}
+        />
+      )}
     </div>
   );
 }
 
-function OrderDetail({
+// Shared by the orders page and the overview.
+export function OrdersTable({
+  orders,
+  people,
+  locale,
+  t,
+  onOpen,
+  onChanged,
+  loaded,
+}: {
+  orders: Order[];
+  people: Person[];
+  locale: Locale;
+  t: Dictionary;
+  onOpen: (id: string) => void;
+  onChanged: () => void;
+  loaded: boolean;
+}) {
+  const a = t.adminUi;
+  const me = useUser();
+  const [error, setError] = useState<string | null>(null);
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const staff = people.filter(isStaffPerson);
+  const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short", timeStyle: "short" });
+
+  async function update(id: string, patch: Partial<Order>) {
+    const { error } = await createClient().from("orders").update(patch).eq("id", id);
+    setError(error?.message ?? null);
+    onChanged();
+  }
+
+  async function remove(o: Order) {
+    if (!window.confirm(a.confirmDelete)) return;
+    const { error } = await createClient().from("orders").delete().eq("id", o.id);
+    setError(error?.message ?? null);
+    onChanged();
+  }
+
+  return (
+    <>
+      <ErrorNote error={error} />
+      <Table head={[a.date, t.adminUi.site, a.category, a.items, a.orderedBy, a.assignee, a.status, ""]}>
+        {orders.map((o) => (
+          <tr key={o.id}>
+            <td className="whitespace-nowrap text-xs text-silver-dim">{dateTime.format(new Date(o.created_at))}</td>
+            <td className="min-w-32 text-white">{o.projects?.name}</td>
+            <td className="text-silver-dim">{t.orderCategory[o.category]}</td>
+            <td>
+              {o.order_items.length ? (
+                o.order_items.map((i) => (
+                  <div key={i.id} className="text-xs">
+                    {i.description} <span className="text-silver-dim">×{i.quantity} {i.unit}</span>
+                  </div>
+                ))
+              ) : (
+                <span className="text-xs text-silver-dim">{o.note ?? "—"}</span>
+              )}
+            </td>
+            <td className="text-silver-dim">{personName(byId.get(o.created_by ?? ""))}</td>
+            <td>
+              <Select
+                value={o.assignee_id ?? ""}
+                onChange={(e) => update(o.id, { assignee_id: e.target.value || null })}
+                className="w-auto py-1 text-xs"
+              >
+                <option value="">—</option>
+                {staff.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {personName(p)}
+                  </option>
+                ))}
+              </Select>
+            </td>
+            <td>
+              <StatusMenu
+                value={o.status}
+                options={ORDER_STATUSES}
+                label={(s) => t.orderStatus[s]}
+                tone={orderStatusTone}
+                onChange={(status) => update(o.id, { status })}
+              />
+            </td>
+            <td>
+              <div className="flex justify-end gap-1.5">
+                <IconButton onClick={() => onOpen(o.id)} title={a.details}>
+                  <Pencil size={14} />
+                </IconButton>
+                {me.roles.includes("admin") && (
+                  <IconButton danger onClick={() => remove(o)} title={a.delete}>
+                    <Trash2 size={14} />
+                  </IconButton>
+                )}
+              </div>
+            </td>
+          </tr>
+        ))}
+        {loaded && !orders.length && <EmptyRow cols={8}>{t.admin.noOrders}</EmptyRow>}
+      </Table>
+    </>
+  );
+}
+
+export function OrderModal({
   order,
   t,
-  dateTime,
-  dateFormatLocale,
-  staff,
+  locale,
   people,
   contacts,
+  onClose,
   onSaved,
 }: {
   order: Order;
   t: Dictionary;
-  dateTime: Intl.DateTimeFormat;
-  dateFormatLocale: string;
-  staff: { id: string; full_name: string; email: string | null }[];
-  people: Map<string, { full_name: string; email: string | null }>;
+  locale: Locale;
+  people: Person[];
   contacts: ContactRef[];
+  onClose: () => void;
   onSaved: () => void;
 }) {
   const a = t.adminUi;
@@ -189,6 +280,9 @@ function OrderDetail({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium", timeStyle: "short" });
+  const date = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium" });
   const events = useLoad(async () =>
     must<OrderEvent[]>(
       await createClient()
@@ -203,105 +297,113 @@ function OrderDetail({
     setBusy(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        status: form.status,
-        assignee_id: form.assignee_id || null,
-        contact_id: form.contact_id || null,
-        delivery_date: form.delivery_date || null,
-      })
-      .eq("id", order.id);
-    if (!error && comment.trim()) {
-      const res = await supabase.from("order_events").insert({ order_id: order.id, note: comment.trim() });
-      if (res.error) setError(res.error.message);
-      else setComment("");
+    try {
+      must(
+        await supabase
+          .from("orders")
+          .update({
+            status: form.status,
+            assignee_id: form.assignee_id || null,
+            contact_id: form.contact_id || null,
+            delivery_date: form.delivery_date || null,
+          })
+          .eq("id", order.id),
+      );
+      if (comment.trim()) must(await supabase.from("order_events").insert({ order_id: order.id, note: comment.trim() }));
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
     }
-    setBusy(false);
-    if (error) return setError(error.message);
-    events.reload();
-    onSaved();
   }
 
   return (
-    <div className="grid gap-6 border-t border-line bg-panel-2/40 px-5 py-5 lg:grid-cols-2">
-      <div className="space-y-4">
-        <div className="space-y-1 text-sm">
-          {order.order_items.map((i) => (
-            <div key={i.id} className="flex justify-between gap-4">
-              <span className="text-silver">{i.description}</span>
-              <span className="text-silver-dim">
-                {i.quantity} {i.unit}
-              </span>
-            </div>
-          ))}
-          {order.needed_by && (
-            <p className="pt-2 text-xs text-silver-dim">
-              {a.neededBy}: {new Date(order.needed_by).toLocaleDateString(dateFormatLocale)}
-            </p>
-          )}
-          {order.note && <p className="pt-2 text-silver-dim">{order.note}</p>}
+    <Modal title={`${order.projects?.name ?? ""} · ${t.orderCategory[order.category]}`} onClose={onClose} wide>
+      <div className="grid gap-6 md:grid-cols-[1.3fr_1fr]">
+        <div className="space-y-4">
+          <div className="space-y-1 rounded-lg bg-panel-2 p-4 text-sm">
+            {order.order_items.map((i) => (
+              <div key={i.id} className="flex justify-between gap-4">
+                <span className="text-silver">{i.description}</span>
+                <span className="whitespace-nowrap text-silver-dim">
+                  {i.quantity} {i.unit}
+                </span>
+              </div>
+            ))}
+            {order.needed_by && (
+              <p className="pt-2 text-xs text-gold">
+                {a.neededBy}: {date.format(new Date(order.needed_by))}
+              </p>
+            )}
+            {order.note && <p className="pt-2 text-silver-dim">{order.note}</p>}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={a.status}>
+              <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as OrderStatus })}>
+                {ORDER_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {t.orderStatus[s]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={a.assignee}>
+              <Select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
+                <option value="">—</option>
+                {people.filter(isStaffPerson).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {personName(p)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={a.supplier}>
+              <Select value={form.contact_id} onChange={(e) => setForm({ ...form, contact_id: e.target.value })}>
+                <option value="">—</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {[c.company, c.person].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={a.deliveryDate}>
+              <Input
+                type="date"
+                value={form.delivery_date}
+                onChange={(e) => setForm({ ...form, delivery_date: e.target.value })}
+              />
+            </Field>
+          </div>
+          <Field label={a.comment}>
+            <Textarea value={comment} onChange={(e) => setComment(e.target.value)} />
+          </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={a.status}>
-            <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as OrderStatus })}>
-              {ORDER_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t.orderStatus[s]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={a.assignee}>
-            <Select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
-              <option value="">–</option>
-              {staff.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {personName(p)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={a.supplier}>
-            <Select value={form.contact_id} onChange={(e) => setForm({ ...form, contact_id: e.target.value })}>
-              <option value="">–</option>
-              {contacts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {[c.company, c.person].filter(Boolean).join(" · ")}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={a.deliveryDate}>
-            <Input
-              type="date"
-              value={form.delivery_date}
-              onChange={(e) => setForm({ ...form, delivery_date: e.target.value })}
-            />
-          </Field>
+        <div>
+          <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-gold">{a.history}</h4>
+          <ErrorNote error={events.error} />
+          <ol className="space-y-3 border-l border-line pl-4 text-sm">
+            {events.data?.map((e) => (
+              <li key={e.id}>
+                <div className="text-xs text-silver-dim">
+                  {dateTime.format(new Date(e.created_at))} · {personName(byId.get(e.actor_id ?? ""))}
+                </div>
+                <div className="text-silver">{e.status ? t.orderStatus[e.status] : e.note}</div>
+              </li>
+            ))}
+          </ol>
         </div>
-        <Field label={a.comment}>
-          <Textarea value={comment} onChange={(e) => setComment(e.target.value)} />
-        </Field>
-        <ErrorNote error={error} />
+      </div>
+      <ErrorNote error={error} />
+      <ModalActions>
+        <Button variant="ghost" onClick={onClose}>
+          {a.cancel}
+        </Button>
         <Button onClick={save} disabled={busy}>
           {a.save}
         </Button>
-      </div>
-      <div>
-        <h3 className="mb-3 text-sm font-medium text-white">{a.history}</h3>
-        <ErrorNote error={events.error} />
-        <ol className="space-y-3 border-l border-line pl-4 text-sm">
-          {events.data?.map((e) => (
-            <li key={e.id}>
-              <div className="text-xs text-silver-dim">
-                {dateTime.format(new Date(e.created_at))} · {personName(people.get(e.actor_id ?? ""))}
-              </div>
-              <div className="text-silver">{e.status ? t.orderStatus[e.status] : emptyToNull(e.note ?? "")}</div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
+      </ModalActions>
+    </Modal>
   );
 }

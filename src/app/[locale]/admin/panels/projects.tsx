@@ -2,17 +2,38 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Card, ProgressBar } from "@/components/ui";
+import { History, Pencil, Plus, Trash2 } from "lucide-react";
+import { ProgressBar } from "@/components/ui";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import type { Dictionary, Locale } from "@/i18n";
-import { Badge, Empty, ErrorNote, Field, Input, SectionHeader, Select, Textarea, emptyToNull, must, toDateInput, useLoad } from "../kit";
+import {
+  EmptyRow,
+  ErrorNote,
+  Field,
+  IconButton,
+  Input,
+  Modal,
+  ModalActions,
+  Panel,
+  SectionHeader,
+  Select,
+  StatusMenu,
+  Table,
+  Textarea,
+  emptyToNull,
+  must,
+  toDateInput,
+  useLoad,
+} from "../kit";
 import {
   PROJECT_STATUSES,
   STAGE_STATUSES,
   isStaffPerson,
   loadPeople,
   personName,
+  projectStatusTone,
+  stageStatusTone,
   type Person,
   type ProjectStatus,
   type StageStatus,
@@ -47,75 +68,100 @@ async function loadAll() {
 export function ProjectsSection({ locale, t }: { locale: Locale; t: Dictionary }) {
   const { data, error, reload } = useLoad(loadAll);
   const [editing, setEditing] = useState<Project | "new" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const a = t.adminUi;
   const people = new Map(data?.people.map((p) => [p.id, p]));
 
-  if (editing && data) {
-    return (
-      <ProjectForm
-        locale={locale}
-        t={t}
-        project={editing === "new" ? null : editing}
-        people={data.people}
-        onClose={() => {
-          setEditing(null);
-          reload();
-        }}
-      />
-    );
+  async function run(action: PromiseLike<{ error: { message: string } | null }>) {
+    const { error } = await action;
+    setActionError(error?.message ?? null);
+    reload();
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       <SectionHeader title={t.admin.sections.projects}>
-        <Button onClick={() => setEditing("new")}>+ {a.newProject}</Button>
+        <Button onClick={() => setEditing("new")}>
+          <Plus size={16} /> {a.newProject}
+        </Button>
       </SectionHeader>
-      <ErrorNote error={error} />
-      {data && !data.projects.length && (
-        <Card>
-          <Empty>{a.noProjects}</Empty>
-        </Card>
-      )}
-      <div className="grid gap-4 md:grid-cols-2">
-        {data?.projects.map((p) => (
-          <button key={p.id} onClick={() => setEditing(p)} className="text-left">
-            <Card className="h-full space-y-3 transition hover:border-olive/60">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium text-white">{p.name}</div>
-                  <div className="text-xs text-silver-dim">{p.address}</div>
+      <ErrorNote error={error ?? actionError} />
+
+      <Panel>
+        <Table head={[a.name, a.address, a.siteManager, a.membersShort, t.common.progress, a.status, ""]}>
+          {data?.projects.map((p) => (
+            <tr key={p.id}>
+              <td className="font-medium text-white">{p.name}</td>
+              <td className="text-silver-dim">{p.address}</td>
+              <td className="text-silver-dim">{personName(people.get(p.manager_id ?? ""))}</td>
+              <td className="text-silver-dim">{p.project_members.length}</td>
+              <td className="w-40">
+                <div className="mb-1 text-xs text-silver-dim">{p.progress}%</div>
+                <ProgressBar value={p.progress} />
+              </td>
+              <td>
+                <StatusMenu
+                  value={p.status}
+                  options={PROJECT_STATUSES}
+                  label={(s) => a.projectStatus[s]}
+                  tone={projectStatusTone}
+                  onChange={(status) => run(createClient().from("projects").update({ status }).eq("id", p.id))}
+                />
+              </td>
+              <td>
+                <div className="flex justify-end gap-1.5">
+                  <Link
+                    href={`/${locale}/admin/orders/?project=${p.id}`}
+                    title={a.orderHistory}
+                    className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-silver transition hover:border-gold hover:text-gold"
+                  >
+                    <History size={14} />
+                  </Link>
+                  <IconButton onClick={() => setEditing(p)} title={a.edit}>
+                    <Pencil size={14} />
+                  </IconButton>
+                  <IconButton
+                    danger
+                    title={a.delete}
+                    onClick={() =>
+                      window.confirm(a.confirmDelete) && run(createClient().from("projects").delete().eq("id", p.id))
+                    }
+                  >
+                    <Trash2 size={14} />
+                  </IconButton>
                 </div>
-                <Badge tone={p.status === "active" ? "olive" : "dim"}>{a.projectStatus[p.status]}</Badge>
-              </div>
-              <ProgressBar value={p.progress} />
-              <div className="flex justify-between text-xs text-silver-dim">
-                <span>
-                  {a.siteManager}: {personName(people.get(p.manager_id ?? ""))}
-                </span>
-                <span>
-                  {p.project_members.length} {a.membersShort}
-                </span>
-              </div>
-            </Card>
-          </button>
-        ))}
-      </div>
+              </td>
+            </tr>
+          ))}
+          {data && !data.projects.length && <EmptyRow cols={7}>{a.noProjects}</EmptyRow>}
+        </Table>
+      </Panel>
+
+      {editing && data && (
+        <ProjectModal
+          t={t}
+          project={editing === "new" ? null : editing}
+          people={data.people}
+          onClose={() => setEditing(null)}
+          onSaved={reload}
+        />
+      )}
     </div>
   );
 }
 
-function ProjectForm({
-  locale,
+function ProjectModal({
   t,
   project,
   people,
   onClose,
+  onSaved,
 }: {
-  locale: Locale;
   t: Dictionary;
   project: Project | null;
   people: Person[];
   onClose: () => void;
+  onSaved: () => void;
 }) {
   const a = t.adminUi;
   const [form, setForm] = useState({
@@ -161,6 +207,7 @@ function ProjectForm({
         must(await supabase.from("project_members").insert(added.map((user_id) => ({ project_id: saved.id, user_id }))));
       if (removed.length)
         must(await supabase.from("project_members").delete().eq("project_id", saved.id).in("user_id", removed));
+      onSaved();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -168,30 +215,9 @@ function ProjectForm({
     }
   }
 
-  async function remove() {
-    if (!project || !window.confirm(a.confirmDelete)) return;
-    const { error } = await createClient().from("projects").delete().eq("id", project.id);
-    if (error) return setError(error.message);
-    onClose();
-  }
-
   return (
-    <div className="space-y-6">
-      <SectionHeader title={project ? project.name : a.newProject}>
-        {project && (
-          <Link
-            href={`/${locale}/admin/orders/?project=${project.id}`}
-            className="rounded-full border border-line px-4 py-2 text-sm hover:border-olive"
-          >
-            {a.orderHistory}
-          </Link>
-        )}
-        <Button variant="ghost" onClick={onClose}>
-          {a.back}
-        </Button>
-      </SectionHeader>
-
-      <Card className="grid gap-4 sm:grid-cols-2">
+    <Modal title={project ? project.name : a.newProject} onClose={onClose} wide>
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label={a.name}>
           <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
@@ -218,7 +244,7 @@ function ProjectForm({
         </Field>
         <Field label={a.siteManagerHint}>
           <Select value={form.manager_id} onChange={(e) => setForm({ ...form, manager_id: e.target.value })}>
-            <option value="">–</option>
+            <option value="">—</option>
             {people.filter(isStaffPerson).map((p) => (
               <option key={p.id} value={p.id}>
                 {personName(p)}
@@ -253,8 +279,8 @@ function ProjectForm({
                       else next.add(p.id);
                       setMembers(next);
                     }}
-                    className={`rounded-full border px-3 py-1 text-sm transition ${
-                      on ? "border-olive bg-olive/20 text-white" : "border-line text-silver-dim hover:border-olive/60"
+                    className={`rounded-md border px-3 py-1 text-sm transition ${
+                      on ? "border-gold bg-gold/15 text-gold" : "border-line text-silver-dim hover:border-gold/60"
                     }`}
                   >
                     {personName(p)}
@@ -266,23 +292,20 @@ function ProjectForm({
             <p className="text-sm text-silver-dim">{a.noTeam}</p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-          <Button onClick={save} disabled={busy}>
-            {a.save}
-          </Button>
-          {project && (
-            <Button variant="ghost" onClick={remove} disabled={busy}>
-              {a.delete}
-            </Button>
-          )}
-        </div>
-        <div className="sm:col-span-2">
-          <ErrorNote error={error} />
-        </div>
-      </Card>
+      </div>
+
+      <ErrorNote error={error} />
+      <ModalActions>
+        <Button variant="ghost" onClick={onClose}>
+          {a.cancel}
+        </Button>
+        <Button onClick={save} disabled={busy}>
+          {a.save}
+        </Button>
+      </ModalActions>
 
       {project && <StagesEditor projectId={project.id} t={t} />}
-    </div>
+    </Modal>
   );
 }
 
@@ -306,57 +329,58 @@ function StagesEditor({ projectId, t }: { projectId: string; t: Dictionary }) {
     reload();
   }
 
-  const stages = createClient().from("project_stages");
+  const stages = () => createClient().from("project_stages");
 
   return (
-    <Card className="space-y-4">
-      <h2 className="font-medium text-white">{t.client.stages}</h2>
+    <div className="mt-8 border-t border-line pt-6">
+      <h4 className="mb-3 font-display text-lg text-gold">{t.client.stages}</h4>
       <ErrorNote error={error ?? actionError} />
       <ul className="divide-y divide-line">
         {data?.map((s) => (
-          <li key={s.id} className="grid gap-3 py-3 sm:grid-cols-[1fr_10rem_6rem_auto] sm:items-center">
+          <li key={s.id} className="grid grid-cols-[1fr_auto_5rem_auto] items-center gap-3 py-2.5">
             <span className="text-sm text-silver">{s.title}</span>
-            <Select
+            <StatusMenu
               value={s.status}
-              onChange={(e) => run(stages.update({ status: e.target.value }).eq("id", s.id))}
-            >
-              {STAGE_STATUSES.map((st) => (
-                <option key={st} value={st}>
-                  {t.stageStatus[st]}
-                </option>
-              ))}
-            </Select>
+              options={STAGE_STATUSES}
+              label={(st) => t.stageStatus[st]}
+              tone={stageStatusTone}
+              onChange={(status) => run(stages().update({ status }).eq("id", s.id))}
+            />
             <Input
               type="number"
               min={0}
               max={100}
               defaultValue={s.progress}
+              className="py-1"
               onBlur={(e) =>
                 Number(e.target.value) !== s.progress &&
-                run(stages.update({ progress: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }).eq("id", s.id))
+                run(stages().update({ progress: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }).eq("id", s.id))
               }
             />
-            <button
-              onClick={() => window.confirm(a.confirmDelete) && run(stages.delete().eq("id", s.id))}
-              className="text-xs text-silver-dim hover:text-red-300"
+            <IconButton
+              danger
+              title={a.delete}
+              onClick={() => window.confirm(a.confirmDelete) && run(stages().delete().eq("id", s.id))}
             >
-              {a.delete}
-            </button>
+              <Trash2 size={14} />
+            </IconButton>
           </li>
         ))}
       </ul>
       <form
-        className="flex gap-2"
+        className="mt-3 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           if (!title.trim()) return;
-          run(stages.insert({ project_id: projectId, title: title.trim(), position: data?.length ?? 0 }));
+          run(stages().insert({ project_id: projectId, title: title.trim(), position: data?.length ?? 0 }));
           setTitle("");
         }}
       >
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={a.newStage} />
-        <Button type="submit">{a.add}</Button>
+        <Button type="submit" variant="ghost">
+          <Plus size={16} /> {a.add}
+        </Button>
       </form>
-    </Card>
+    </div>
   );
 }
