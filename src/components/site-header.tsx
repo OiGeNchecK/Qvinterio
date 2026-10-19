@@ -20,7 +20,7 @@ export function SiteHeader({ locale, t }: { locale: Locale; t: Dictionary }) {
       </nav>
       <div className="flex items-center gap-3">
         <LocaleSwitcher />
-        <ButtonLink href={`/${locale}/login/?for=team`} variant="ghost" className="px-3 text-xs sm:px-5 sm:text-sm">
+        <ButtonLink href={`/${locale}/login/?for=team`} variant="ghost" className="px-3! text-xs! sm:px-5! sm:text-sm!">
           {t.nav.teamLogin}
         </ButtonLink>
       </div>

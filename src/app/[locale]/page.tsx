@@ -1,11 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/button";
+import { SecretEmblem } from "@/components/secret-emblem";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
 import { projects } from "@/content/projects";
-import { asset } from "@/lib/paths";
 
 export default async function Home({ params }: PageProps<"/[locale]">) {
   const { locale, t } = getDictionary((await params).locale);
@@ -26,25 +26,12 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
           </h1>
           <p className="mt-6 max-w-xl text-lg text-silver-dim">{t.home.lead}</p>
           <div className="mt-10 flex flex-wrap gap-3">
-            <ButtonLink href={`/${locale}/login/?for=client`}>{t.nav.clientLogin}</ButtonLink>
+            <ButtonLink href={`/${locale}/login/?for=client`} className="px-9! py-4! text-lg!">
+              {t.nav.clientLogin}
+            </ButtonLink>
           </div>
         </div>
-        {/* The emblem doubles as the (unlabelled) entrance to the admin panel. */}
-        <Link
-          href={`/${locale}/login/?for=admin`}
-          aria-label="Qvinterio"
-          className="relative mx-auto block aspect-square w-full max-w-md rounded-full"
-        >
-          <div className="absolute inset-0 rounded-full bg-gold/10 blur-3xl" />
-          <Image
-            src={asset("/brand/emblem.webp")}
-            alt="Qvinterio"
-            fill
-            sizes="(min-width: 1024px) 28rem, 80vw"
-            className="rounded-full object-cover ring-1 ring-line"
-            priority
-          />
-        </Link>
+        <SecretEmblem locale={locale} />
       </section>
 
       <section className="relative z-10 mx-auto max-w-7xl px-4 pb-16">
