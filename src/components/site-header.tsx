@@ -15,7 +15,7 @@ export function SiteHeader({ locale, t }: { locale: Locale; t: Dictionary }) {
       <Logo href={home} />
       <nav className="hidden gap-2 text-sm md:flex">
         <Link href={`${home}#works`} className={navLink}>{t.nav.works}</Link>
-        <Link href={`${home}#services`} className={navLink}>{t.nav.services}</Link>
+        <Link href={`/${locale}/leistungen/`} className={navLink}>{t.nav.services}</Link>
         <Link href={`${home}#contact`} className={navLink}>{t.nav.contact}</Link>
       </nav>
       <div className="flex items-center gap-3">
