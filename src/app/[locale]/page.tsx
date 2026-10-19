@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/button";
 import { SecretEmblem } from "@/components/secret-emblem";
-import { Threads } from "@/components/threads";
+import { SiteBackground } from "@/components/site-background";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
@@ -13,10 +13,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
   return (
     <div className="relative overflow-hidden">
-      {/* Gold threads behind the whole page, fixed to the viewport. */}
-      <div className="fixed inset-0">
-        <Threads />
-      </div>
+      <SiteBackground />
 
       <div className="relative">
         <SiteHeader locale={locale} t={t} />

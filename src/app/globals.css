@@ -87,3 +87,17 @@ body {
     animation: none;
   }
 }
+
+/* Static grid shown until (or instead of, without WebGL2) the Grid Scan room. */
+.site-bg-fallback {
+  background-image:
+    linear-gradient(rgb(55 55 45 / 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(55 55 45 / 0.55) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse at center, transparent 20%, black 85%);
+}
+
+.site-bg:has([data-webgl="on"]) .site-bg-fallback {
+  display: none;
+}
