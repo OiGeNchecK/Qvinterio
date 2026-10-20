@@ -299,6 +299,7 @@ const de = {
     material: "Material",
     container: "Container",
     equipment: "Technik",
+    tool: "Werkzeuge",
     other: "Sonstiges",
   },
   stageStatus: {

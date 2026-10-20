@@ -301,6 +301,7 @@ const uk: Dictionary = {
     material: "Матеріали",
     container: "Контейнери",
     equipment: "Техніка",
+    tool: "Інструменти",
     other: "Інше",
   },
   stageStatus: {

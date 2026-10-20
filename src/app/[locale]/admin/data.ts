@@ -5,7 +5,7 @@ import { must, type Tone } from "./kit";
 export type ProjectStatus = "planned" | "active" | "paused" | "done";
 export type StageStatus = "pending" | "in_progress" | "done";
 export type OrderStatus = "new" | "in_progress" | "ordered" | "delivered" | "cancelled";
-export type OrderCategory = "material" | "container" | "equipment" | "other";
+export type OrderCategory = "material" | "container" | "equipment" | "tool" | "other";
 export type ContactType =
   | "supplier_material"
   | "supplier_container"
@@ -17,7 +17,7 @@ export type ContactType =
 export const PROJECT_STATUSES: ProjectStatus[] = ["planned", "active", "paused", "done"];
 export const STAGE_STATUSES: StageStatus[] = ["pending", "in_progress", "done"];
 export const ORDER_STATUSES: OrderStatus[] = ["new", "in_progress", "ordered", "delivered", "cancelled"];
-export const ORDER_CATEGORIES: OrderCategory[] = ["material", "container", "equipment", "other"];
+export const ORDER_CATEGORIES: OrderCategory[] = ["material", "container", "equipment", "tool", "other"];
 export const CONTACT_TYPES: ContactType[] = [
   "supplier_material",
   "supplier_container",
