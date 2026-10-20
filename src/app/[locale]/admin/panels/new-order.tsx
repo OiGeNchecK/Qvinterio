@@ -22,6 +22,7 @@ import {
   useLoad,
 } from "../kit";
 import { ORDER_CATEGORIES, type OrderCategory, type ProjectRef } from "../data";
+import type { ContactRef } from "./orders";
 
 type CatalogItem = { id: string; category: OrderCategory; name: string; unit: string; active: boolean };
 
@@ -41,17 +42,25 @@ const emptyLine = (): Line => ({ pick: "", text: "", quantity: "1", unit: "Stk" 
 export function NewOrderModal({
   t,
   projects,
+  contacts,
   onClose,
   onSaved,
 }: {
   t: Dictionary;
   projects: ProjectRef[];
+  contacts: ContactRef[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const a = t.adminUi;
   const catalog = useLoad(loadCatalog);
-  const [form, setForm] = useState({ project_id: "", category: "material" as OrderCategory, needed_by: "", note: "" });
+  const [form, setForm] = useState({
+    project_id: "",
+    category: "material" as OrderCategory,
+    contact_id: "",
+    needed_by: "",
+    note: "",
+  });
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +92,7 @@ export function NewOrderModal({
           .insert({
             project_id: form.project_id,
             category: form.category,
+            contact_id: form.contact_id || null,
             needed_by: form.needed_by || null,
             note: emptyToNull(form.note),
           })
@@ -100,7 +110,7 @@ export function NewOrderModal({
 
   return (
     <Modal title={a.newOrder} onClose={onClose} wide>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label={a.site}>
           <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
             <option value="">—</option>
@@ -122,6 +132,16 @@ export function NewOrderModal({
             {ORDER_CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {t.orderCategory[c]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={a.supplier}>
+          <Select value={form.contact_id} onChange={(e) => setForm({ ...form, contact_id: e.target.value })}>
+            <option value="">—</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {[c.company, c.person].filter(Boolean).join(" · ")}
               </option>
             ))}
           </Select>

@@ -54,7 +54,7 @@ export type Order = {
 };
 
 type OrderEvent = { id: number; actor_id: string | null; status: OrderStatus | null; note: string | null; created_at: string };
-type ContactRef = { id: string; company: string | null; person: string | null };
+export type ContactRef = { id: string; company: string | null; person: string | null };
 
 export const ORDER_SELECT =
   "id, project_id, created_by, assignee_id, contact_id, category, status, needed_by, delivery_date, note, created_at, projects(name), order_items(id, description, quantity, unit)";
@@ -145,7 +145,13 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
       </Panel>
 
       {dialog === "new" && data && (
-        <NewOrderModal t={t} projects={data.projects} onClose={() => setDialog(null)} onSaved={reload} />
+        <NewOrderModal
+          t={t}
+          projects={data.projects}
+          contacts={data.contacts}
+          onClose={() => setDialog(null)}
+          onSaved={reload}
+        />
       )}
       {dialog === "catalog" && <CatalogModal t={t} onClose={() => setDialog(null)} />}
 
