@@ -194,6 +194,7 @@ export function OrdersTable({
   const byId = new Map(people.map((p) => [p.id, p]));
   const staff = people.filter(isStaffPerson);
   const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short", timeStyle: "short" });
+  const date = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short" });
 
   async function update(id: string, patch: Partial<Order>) {
     const { error } = await createClient().from("orders").update(patch).eq("id", id);
@@ -214,7 +215,14 @@ export function OrdersTable({
       <Table head={[a.date, t.adminUi.site, a.category, a.items, a.orderedBy, a.assignee, a.status, ""]}>
         {orders.map((o) => (
           <tr key={o.id}>
-            <td className="whitespace-nowrap text-xs text-silver-dim">{dateTime.format(new Date(o.created_at))}</td>
+            <td className="whitespace-nowrap text-xs text-silver-dim">
+              {dateTime.format(new Date(o.created_at))}
+              {o.needed_by && (
+                <div className="mt-1 text-gold">
+                  {a.neededBy} {date.format(new Date(o.needed_by))}
+                </div>
+              )}
+            </td>
             <td className="min-w-32 text-white">{o.projects?.name}</td>
             <td className="text-silver-dim">{t.orderCategory[o.category]}</td>
             <td>
