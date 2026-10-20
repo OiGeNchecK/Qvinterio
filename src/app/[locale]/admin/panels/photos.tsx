@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, ExternalLink, Trash2, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Download, ExternalLink, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import { dateLocale, type Dictionary, type Locale } from "@/i18n";
-import { Badge, ErrorNote, Field, IconButton, Input, Modal, Panel, SectionHeader, Select, emptyToNull, must, useLoad } from "../kit";
+import { Badge, ErrorNote, Field, IconButton, Input, Modal, ModalActions, Panel, SectionHeader, Select, emptyToNull, must, useLoad } from "../kit";
 import { loadPeople, loadProjectRefs, personName, type ProjectRef } from "../data";
 import { shrink } from "../upload";
 
@@ -17,6 +17,7 @@ export type SitePhoto = {
   id: string;
   project_id: string;
   author_id: string | null;
+  stage_id: string | null;
   storage_path: string;
   caption: string | null;
   visible_to_client: boolean;
@@ -36,7 +37,7 @@ export async function loadSitePhotos(filter: Partial<Filter>, limit: number) {
   let query = supabase
     .from("photos")
     .select(
-      "id, project_id, author_id, storage_path, caption, visible_to_client, taken_at, created_at, project:projects(name), stage:project_stages(title), author:profiles(full_name, email)",
+      "id, project_id, author_id, stage_id, storage_path, caption, visible_to_client, taken_at, created_at, project:projects(name), stage:project_stages(title), author:profiles(full_name, email)",
     )
     .order("created_at", { ascending: filter.order === "oldest" })
     .limit(limit);
@@ -72,6 +73,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   const [actionError, setActionError] = useState<string | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState<SitePhoto | null>(null);
 
   function change(next: Partial<Filter>) {
     setFilter({ ...filter, ...next });
@@ -241,9 +243,99 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
           onPrev={openIndex > 0 ? () => setOpenIndex(openIndex - 1) : undefined}
           onNext={openIndex < photos.length - 1 ? () => setOpenIndex(openIndex + 1) : undefined}
           onToggle={() => toggle(opened)}
+          paused={!!editing}
+          onEdit={() => setEditing(opened)}
+          onDownload={() => run(() => downloadPhoto(opened, opened.project?.name).then(() => null, (e: Error) => e.message))}
           onDelete={() => remove(opened)}
         />
       )}
+      {editing && refs.data && (
+        <EditPhotoModal
+          photo={editing}
+          projects={refs.data.projects}
+          t={t}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export type PhotoForm = { project_id: string; stage_id: string; caption: string; visible_to_client: boolean };
+
+// Site (when the list of sites is given), stage, caption and client visibility.
+export function PhotoFields({
+  form,
+  setForm,
+  projects,
+  t,
+}: {
+  form: PhotoForm;
+  setForm: (form: PhotoForm) => void;
+  projects?: ProjectRef[];
+  t: Dictionary;
+}) {
+  const w = t.worker;
+  const [loadedStages, setStages] = useState<{ projectId: string; list: { id: string; title: string }[] }>({ projectId: "", list: [] });
+  const stages = loadedStages.projectId === form.project_id ? loadedStages.list : [];
+
+  useEffect(() => {
+    const projectId = form.project_id;
+    if (!projectId) return;
+    let active = true;
+    createClient()
+      .from("project_stages")
+      .select("id, title")
+      .eq("project_id", projectId)
+      .order("position")
+      .then(({ data }) => active && setStages({ projectId, list: data ?? [] }));
+    return () => {
+      active = false;
+    };
+  }, [form.project_id]);
+
+  return (
+    <div className="space-y-3">
+      {projects && (
+        <Field label={t.adminUi.site}>
+          <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value, stage_id: "" })}>
+            <option value="">—</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      {!!stages.length && (
+        <Field label={w.stage}>
+          <Select value={form.stage_id} onChange={(e) => setForm({ ...form, stage_id: e.target.value })}>
+            <option value="">—</option>
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      <Field label={w.caption}>
+        <Input value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} />
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-silver">
+        <input
+          type="checkbox"
+          checked={form.visible_to_client}
+          onChange={(e) => setForm({ ...form, visible_to_client: e.target.checked })}
+          className="accent-[var(--color-gold)]"
+        />
+        {w.visibleToClient}
+      </label>
     </div>
   );
 }
@@ -264,26 +356,9 @@ function UploadModal({
 }) {
   const k = t.sitePhotos;
   const w = t.worker;
-  const [form, setForm] = useState({ project_id: projectId, stage_id: "", caption: "", visible_to_client: true });
-  const [loadedStages, setStages] = useState<{ projectId: string; list: { id: string; title: string }[] }>({ projectId: "", list: [] });
-  const stages = loadedStages.projectId === form.project_id ? loadedStages.list : [];
+  const [form, setForm] = useState<PhotoForm>({ project_id: projectId, stage_id: "", caption: "", visible_to_client: true });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const projectId = form.project_id;
-    if (!projectId) return;
-    let active = true;
-    createClient()
-      .from("project_stages")
-      .select("id, title")
-      .eq("project_id", projectId)
-      .order("position")
-      .then(({ data }) => active && setStages({ projectId, list: data ?? [] }));
-    return () => {
-      active = false;
-    };
-  }, [form.project_id]);
 
   async function upload(files: File[]) {
     if (!files.length) return;
@@ -320,42 +395,7 @@ function UploadModal({
 
   return (
     <Modal title={k.upload} onClose={onClose}>
-      <div className="space-y-3">
-        <Field label={t.adminUi.site}>
-          <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value, stage_id: "" })}>
-            <option value="">—</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        {!!stages.length && (
-          <Field label={w.stage}>
-            <Select value={form.stage_id} onChange={(e) => setForm({ ...form, stage_id: e.target.value })}>
-              <option value="">—</option>
-              {stages.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        )}
-        <Field label={w.caption}>
-          <Input value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} />
-        </Field>
-        <label className="flex items-center gap-2 text-sm text-silver">
-          <input
-            type="checkbox"
-            checked={form.visible_to_client}
-            onChange={(e) => setForm({ ...form, visible_to_client: e.target.checked })}
-            className="accent-[var(--color-gold)]"
-          />
-          {w.visibleToClient}
-        </label>
-      </div>
+      <PhotoFields form={form} setForm={setForm} projects={projects} t={t} />
       <ErrorNote error={error} />
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <label
@@ -386,6 +426,84 @@ function UploadModal({
   );
 }
 
+type EditablePhoto = { id: string; project_id: string; stage_id: string | null; caption: string | null; visible_to_client: boolean };
+
+// Changes a photo after upload. The site can only be changed where a list of sites is given.
+export function EditPhotoModal({
+  photo,
+  projects,
+  t,
+  onClose,
+  onSaved,
+}: {
+  photo: EditablePhoto;
+  projects?: ProjectRef[];
+  t: Dictionary;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const a = t.adminUi;
+  const [form, setForm] = useState<PhotoForm>({
+    project_id: photo.project_id,
+    stage_id: photo.stage_id ?? "",
+    caption: photo.caption ?? "",
+    visible_to_client: photo.visible_to_client,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!form.project_id) return setError(t.sitePhotos.chooseSite);
+    setSaving(true);
+    const { error } = await createClient()
+      .from("photos")
+      .update({
+        ...(projects ? { project_id: form.project_id } : {}),
+        stage_id: form.stage_id || null,
+        caption: emptyToNull(form.caption),
+        visible_to_client: form.visible_to_client,
+      })
+      .eq("id", photo.id);
+    setSaving(false);
+    if (error) return setError(error.message);
+    onSaved();
+  }
+
+  return (
+    <Modal title={t.sitePhotos.edit} onClose={onClose}>
+      <PhotoFields form={form} setForm={setForm} projects={projects} t={t} />
+      <ErrorNote error={error} />
+      <ModalActions>
+        <Button variant="ghost" onClick={onClose}>
+          {a.cancel}
+        </Button>
+        <Button onClick={save} disabled={saving}>
+          {a.save}
+        </Button>
+      </ModalActions>
+    </Modal>
+  );
+}
+
+// Saves the file under a readable name: site_2026-10-20_1530.jpg
+export async function downloadPhoto(photo: { storage_path: string; created_at: string }, siteName?: string) {
+  const { data, error } = await createClient().storage.from(BUCKET).download(photo.storage_path);
+  if (error || !data) throw new Error(error?.message ?? "Download failed");
+  const ext = photo.storage_path.split(".").pop() || "jpg";
+  const d = new Date(photo.created_at);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const site = (siteName ?? "foto").normalize("NFKD").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "foto";
+  const url = URL.createObjectURL(data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${site}_${stamp}.${ext}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 // Full-screen view with arrows (also on the keyboard) and the photo details.
 function PhotoViewer({
   photo: p,
@@ -394,7 +512,10 @@ function PhotoViewer({
   onClose,
   onPrev,
   onNext,
+  paused,
   onToggle,
+  onEdit,
+  onDownload,
   onDelete,
 }: {
   photo: SitePhoto;
@@ -403,13 +524,18 @@ function PhotoViewer({
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
+  paused: boolean;
   onToggle: () => void;
+  onEdit: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const k = t.sitePhotos;
   const when = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium", timeStyle: "short" });
 
   useEffect(() => {
+    // The edit dialog on top takes the keyboard while it is open.
+    if (paused) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft") onPrev?.();
@@ -417,7 +543,7 @@ function PhotoViewer({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, onPrev, onNext]);
+  }, [paused, onClose, onPrev, onNext]);
 
   const arrow = "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-line bg-ink/70 p-2 text-silver hover:border-gold hover:text-gold";
 
@@ -472,6 +598,12 @@ function PhotoViewer({
               <ExternalLink size={16} />
             </a>
           )}
+          <IconButton onClick={onEdit} title={k.edit}>
+            <Pencil size={16} />
+          </IconButton>
+          <IconButton onClick={onDownload} title={k.download}>
+            <Download size={16} />
+          </IconButton>
           <IconButton danger onClick={onDelete} title={t.adminUi.delete}>
             <Trash2 size={16} />
           </IconButton>

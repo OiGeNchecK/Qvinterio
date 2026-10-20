@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Camera, Trash2 } from "lucide-react";
+import { Camera, Download, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isStaff, useUser } from "@/lib/auth";
 import { dateLocale, type Dictionary, type Locale } from "@/i18n";
 import { Badge, ErrorNote, Field, IconButton, Input, Select, emptyToNull, must, useLoad } from "../admin/kit";
 import { shrink } from "../admin/upload";
+import { EditPhotoModal, downloadPhoto } from "../admin/panels/photos";
 import type { WorkerSite } from "./worker-home";
 
 const BUCKET = "project-photos";
@@ -55,6 +56,7 @@ export function SitePhotos({ site, locale, t }: { site: WorkerSite; locale: Loca
   const [form, setForm] = useState({ caption: "", stage_id: "", visible_to_client: true });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Photo | null>(null);
   const date = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium" });
   const stageTitle = new Map(data?.stages.map((s) => [s.id, s.title]));
   const canEdit = (p: Photo) => p.author_id === me.id || isStaff(me);
@@ -96,6 +98,15 @@ export function SitePhotos({ site, locale, t }: { site: WorkerSite; locale: Loca
     const { error } = await createClient().from("photos").update({ visible_to_client: !p.visible_to_client }).eq("id", p.id);
     setActionError(error?.message ?? null);
     reload();
+  }
+
+  async function download(p: Photo) {
+    setActionError(null);
+    try {
+      await downloadPhoto({ storage_path: p.storage_path, created_at: p.taken_at }, site.name);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function remove(p: Photo) {
@@ -192,16 +203,37 @@ export function SitePhotos({ site, locale, t }: { site: WorkerSite; locale: Loca
                     {p.visible_to_client ? w.forClient : w.internalOnly}
                   </Badge>
                 )}
-                {canEdit(p) && (
-                  <IconButton danger className="p-2!" onClick={() => remove(p)} title={a.delete}>
-                    <Trash2 size={14} />
+                <div className="flex gap-1.5">
+                  <IconButton className="p-2!" onClick={() => download(p)} title={t.sitePhotos.download}>
+                    <Download size={14} />
                   </IconButton>
-                )}
+                  {canEdit(p) && (
+                    <>
+                      <IconButton className="p-2!" onClick={() => setEditing(p)} title={t.sitePhotos.edit}>
+                        <Pencil size={14} />
+                      </IconButton>
+                      <IconButton danger className="p-2!" onClick={() => remove(p)} title={a.delete}>
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </>
+                  )}
+                </div>
               </div>
             </figcaption>
           </figure>
         ))}
       </div>
+      {editing && (
+        <EditPhotoModal
+          photo={{ ...editing, project_id: site.id }}
+          t={t}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            reload();
+          }}
+        />
+      )}
     </div>
   );
 }

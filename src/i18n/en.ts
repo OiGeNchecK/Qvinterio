@@ -410,6 +410,8 @@ const en: Dictionary = {
     other: "Other",
   },
   sitePhotos: {
+    edit: "Edit photo",
+    download: "Download",
     newestFirst: "Newest first",
     oldestFirst: "Oldest first",
     upload: "Upload photos",

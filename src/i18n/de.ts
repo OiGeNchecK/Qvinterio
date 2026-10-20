@@ -408,6 +408,8 @@ const de = {
     other: "Sonstiges",
   },
   sitePhotos: {
+    edit: "Foto bearbeiten",
+    download: "Herunterladen",
     newestFirst: "Neueste zuerst",
     oldestFirst: "Älteste zuerst",
     upload: "Fotos hochladen",

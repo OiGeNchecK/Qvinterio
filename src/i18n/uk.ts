@@ -410,6 +410,8 @@ const uk: Dictionary = {
     other: "Інше",
   },
   sitePhotos: {
+    edit: "Редагувати фото",
+    download: "Скачати",
     newestFirst: "Спочатку нові",
     oldestFirst: "Спочатку старі",
     upload: "Завантажити фото",
