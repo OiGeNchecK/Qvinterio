@@ -1,7 +1,7 @@
 // Account management that needs the service key.
 // Admins: create a user with roles, set a user's password.
 // Staff (admin or manager): create a client access key bound to one site,
-// or replace a client's key.
+// replace a client's key, or delete a client.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ROLES = ["admin", "manager", "worker", "client"];
@@ -112,6 +112,15 @@ Deno.serve(async (req) => {
       if (typeof body.client_id !== "string") return json({ error: "client_id is required" }, 400);
       if (!(await isClientOnly(body.client_id))) return json({ error: "Only client accounts" }, 400);
       return json({ id: body.client_id, ...(await newClientKey(body.client_id)) });
+    }
+
+    // Each key client has one site, so removing the access removes the account.
+    if (body.action === "client_delete") {
+      if (typeof body.client_id !== "string") return json({ error: "client_id is required" }, 400);
+      if (!(await isClientOnly(body.client_id))) return json({ error: "Only client accounts" }, 400);
+      const { error } = await admin.auth.admin.deleteUser(body.client_id);
+      if (error) return json({ error: error.message }, 400);
+      return json({ id: body.client_id });
     }
 
     if (!isAdmin) return json({ error: "Forbidden" }, 403);

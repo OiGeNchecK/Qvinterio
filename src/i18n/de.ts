@@ -142,6 +142,8 @@ const de = {
     accessKey: "Zugangsschlüssel",
     clientName: "Name des Kunden",
     clientNameHint: "z. B. Familie Müller",
+    reactivate: "Wieder aktivieren",
+    deleteAccessConfirm: "Zugang von {name} löschen? Der Schlüssel funktioniert dann nicht mehr.",
     accessHint: "Der Kunde bekommt einen Zugangsschlüssel und sieht damit nur die freigegebene Baustelle.",
     newClientHint: "Ein Zugangsschlüssel wird erzeugt und an diese Baustelle gebunden. Sie sehen ihn einmal im nächsten Schritt.",
     accessFor: "Zugang für",

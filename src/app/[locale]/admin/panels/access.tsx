@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, CalendarPlus, Check, Copy, KeyRound, Pencil, Plus } from "lucide-react";
+import { Ban, Check, Copy, KeyRound, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import { basePath } from "@/lib/paths";
@@ -86,16 +86,28 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
     reload();
   }
 
-  const extend = (g: Grant, now: number) =>
+  // Lift a revoke; an expired access gets 30 more days from today.
+  const reactivate = (g: Grant, now: number) =>
     run(
       createClient()
         .from("client_access")
         .update({
           revoked_at: null,
-          expires_at: new Date(Math.max(now, +new Date(g.expires_at)) + 30 * DAY).toISOString(),
+          expires_at: new Date(Math.max(now + 30 * DAY, +new Date(g.expires_at))).toISOString(),
         })
         .eq("id", g.id),
     );
+
+  async function remove(g: Grant) {
+    if (!window.confirm(a.deleteAccessConfirm.replace("{name}", personName(people.get(g.client_id))))) return;
+    try {
+      await callAdminUsers({ action: "client_delete", client_id: g.client_id });
+      setActionError(null);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+    reload();
+  }
 
   const revoke = (g: Grant) =>
     run(createClient().from("client_access").update({ revoked_at: new Date().toISOString() }).eq("id", g.id));
@@ -157,14 +169,18 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
                     <IconButton onClick={() => newKey(g)} title={a.newKey}>
                       <KeyRound size={14} />
                     </IconButton>
-                    <IconButton onClick={() => extend(g, Date.now())} title={a.extend30}>
-                      <CalendarPlus size={14} />
-                    </IconButton>
-                    {active && (
+                    {active ? (
                       <IconButton danger onClick={() => revoke(g)} title={a.revoke}>
                         <Ban size={14} />
                       </IconButton>
+                    ) : (
+                      <IconButton onClick={() => reactivate(g, Date.now())} title={a.reactivate}>
+                        <RotateCcw size={14} />
+                      </IconButton>
                     )}
+                    <IconButton danger onClick={() => remove(g)} title={a.delete}>
+                      <Trash2 size={14} />
+                    </IconButton>
                   </div>
                 </td>
               </tr>
@@ -312,7 +328,7 @@ function CredentialsModal({
     setCopied(key);
   }
 
-  // A new end date also lifts a revoke, like extending does.
+  // A new end date also lifts a revoke.
   async function saveDate() {
     if (!date || !c.grantId) return;
     setBusy(true);
