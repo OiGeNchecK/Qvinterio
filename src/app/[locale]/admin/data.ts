@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/client";
 import type { AppRole } from "@/lib/auth";
+import { dateLocale, type Locale } from "@/i18n";
 import { must, type Tone } from "./kit";
 
 export type ProjectStatus = "planned" | "active" | "paused" | "done";
 export type StageStatus = "pending" | "in_progress" | "done";
+export type TaskStatus = "open" | "in_progress" | "blocked" | "done";
 export type OrderStatus = "new" | "in_progress" | "ordered" | "delivered" | "cancelled";
 export type OrderCategory = "material" | "container" | "equipment" | "tool" | "other";
 export type ContactType =
@@ -16,6 +18,7 @@ export type ContactType =
 
 export const PROJECT_STATUSES: ProjectStatus[] = ["planned", "active", "paused", "done"];
 export const STAGE_STATUSES: StageStatus[] = ["pending", "in_progress", "done"];
+export const TASK_STATUSES: TaskStatus[] = ["open", "in_progress", "blocked", "done"];
 export const ORDER_STATUSES: OrderStatus[] = ["new", "in_progress", "ordered", "delivered", "cancelled"];
 export const ORDER_CATEGORIES: OrderCategory[] = ["material", "container", "equipment", "tool", "other"];
 export const CONTACT_TYPES: ContactType[] = [
@@ -72,7 +75,23 @@ const ORDER_TONES: Record<OrderStatus, Tone> = {
 };
 const PROJECT_TONES: Record<ProjectStatus, Tone> = { planned: "sky", active: "green", paused: "amber", done: "gray" };
 const STAGE_TONES: Record<StageStatus, Tone> = { pending: "gray", in_progress: "sky", done: "green" };
+const TASK_TONES: Record<TaskStatus, Tone> = { open: "gray", in_progress: "sky", blocked: "red", done: "green" };
 
 export const orderStatusTone = (s: OrderStatus) => ORDER_TONES[s];
 export const projectStatusTone = (s: ProjectStatus) => PROJECT_TONES[s];
 export const stageStatusTone = (s: StageStatus) => STAGE_TONES[s];
+export const taskStatusTone = (s: TaskStatus) => TASK_TONES[s];
+
+// "21.10. – 25.10.2026", or one side when only one date is set.
+export function formatDateRange(from: string | null, to: string | null, locale: Locale) {
+  const fmt = (d: string, year: boolean) =>
+    new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString(dateLocale(locale), {
+      day: "2-digit",
+      month: "2-digit",
+      ...(year ? { year: "numeric" } : {}),
+    });
+  if (from && to) return `${fmt(from, from.slice(0, 4) !== to.slice(0, 4))} – ${fmt(to, true)}`;
+  if (from) return `${fmt(from, true)} –`;
+  if (to) return `– ${fmt(to, true)}`;
+  return "";
+}

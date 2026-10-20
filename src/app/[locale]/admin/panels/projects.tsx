@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { History, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, History, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { ProgressBar } from "@/components/ui";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
@@ -26,9 +26,11 @@ import {
   toDateInput,
   useLoad,
 } from "../kit";
+import { TasksModal } from "./tasks";
 import {
   PROJECT_STATUSES,
   STAGE_STATUSES,
+  formatDateRange,
   isStaffPerson,
   loadPeople,
   personName,
@@ -52,7 +54,15 @@ type Project = {
   project_members: { user_id: string }[];
 };
 
-type Stage = { id: string; title: string; position: number; status: StageStatus; progress: number };
+type Stage = {
+  id: string;
+  title: string;
+  position: number;
+  status: StageStatus;
+  progress: number;
+  started_at: string | null;
+  finished_at: string | null;
+};
 
 async function loadAll() {
   const [projects, people] = await Promise.all([
@@ -68,6 +78,7 @@ async function loadAll() {
 export function ProjectsSection({ locale, t }: { locale: Locale; t: Dictionary }) {
   const { data, error, reload } = useLoad(loadAll);
   const [editing, setEditing] = useState<Project | "new" | null>(null);
+  const [tasksOf, setTasksOf] = useState<Project | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const a = t.adminUi;
   const people = new Map(data?.people.map((p) => [p.id, p]));
@@ -117,6 +128,9 @@ export function ProjectsSection({ locale, t }: { locale: Locale; t: Dictionary }
                   >
                     <History size={14} />
                   </Link>
+                  <IconButton onClick={() => setTasksOf(p)} title={t.tasks.manage}>
+                    <ListChecks size={14} />
+                  </IconButton>
                   <IconButton onClick={() => setEditing(p)} title={a.edit}>
                     <Pencil size={14} />
                   </IconButton>
@@ -140,24 +154,28 @@ export function ProjectsSection({ locale, t }: { locale: Locale; t: Dictionary }
       {editing && data && (
         <ProjectModal
           t={t}
+          locale={locale}
           project={editing === "new" ? null : editing}
           people={data.people}
           onClose={() => setEditing(null)}
           onSaved={reload}
         />
       )}
+      {tasksOf && <TasksModal project={tasksOf} locale={locale} t={t} onClose={() => setTasksOf(null)} />}
     </div>
   );
 }
 
 function ProjectModal({
   t,
+  locale,
   project,
   people,
   onClose,
   onSaved,
 }: {
   t: Dictionary;
+  locale: Locale;
   project: Project | null;
   people: Person[];
   onClose: () => void;
@@ -304,23 +322,24 @@ function ProjectModal({
         </Button>
       </ModalActions>
 
-      {project && <StagesEditor projectId={project.id} t={t} />}
+      {project && <StagesEditor projectId={project.id} locale={locale} t={t} />}
     </Modal>
   );
 }
 
-function StagesEditor({ projectId, t }: { projectId: string; t: Dictionary }) {
+function StagesEditor({ projectId, locale, t }: { projectId: string; locale: Locale; t: Dictionary }) {
   const a = t.adminUi;
   const { data, error, reload } = useLoad(async () =>
     must<Stage[]>(
       await createClient()
         .from("project_stages")
-        .select("id, title, position, status, progress")
+        .select("id, title, position, status, progress, started_at, finished_at")
         .eq("project_id", projectId)
         .order("position"),
     ),
   );
   const [title, setTitle] = useState("");
+  const [dating, setDating] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function run(action: PromiseLike<{ error: { message: string } | null }>) {
@@ -337,33 +356,60 @@ function StagesEditor({ projectId, t }: { projectId: string; t: Dictionary }) {
       <ErrorNote error={error ?? actionError} />
       <ul className="divide-y divide-line">
         {data?.map((s) => (
-          <li key={s.id} className="grid grid-cols-[1fr_auto_5rem_auto] items-center gap-3 py-2.5">
-            <span className="text-sm text-silver">{s.title}</span>
-            <StatusMenu
-              value={s.status}
-              options={STAGE_STATUSES}
-              label={(st) => t.stageStatus[st]}
-              tone={stageStatusTone}
-              onChange={(status) => run(stages().update({ status }).eq("id", s.id))}
-            />
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              defaultValue={s.progress}
-              className="py-1"
-              onBlur={(e) =>
-                Number(e.target.value) !== s.progress &&
-                run(stages().update({ progress: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }).eq("id", s.id))
-              }
-            />
-            <IconButton
-              danger
-              title={a.delete}
-              onClick={() => window.confirm(a.confirmDelete) && run(stages().delete().eq("id", s.id))}
-            >
-              <Trash2 size={14} />
-            </IconButton>
+          <li key={s.id} className="py-2.5">
+            <div className="grid grid-cols-[1fr_auto_4.5rem_auto_auto] items-center gap-2 sm:gap-3">
+              <div className="min-w-0">
+                <div className="text-sm text-silver">{s.title}</div>
+                {(s.started_at || s.finished_at) && (
+                  <div className="mt-0.5 text-xs text-silver-dim">
+                    {formatDateRange(s.started_at, s.finished_at, locale)}
+                  </div>
+                )}
+              </div>
+              <StatusMenu
+                value={s.status}
+                options={STAGE_STATUSES}
+                label={(st) => t.stageStatus[st]}
+                tone={stageStatusTone}
+                onChange={(status) => run(stages().update({ status }).eq("id", s.id))}
+              />
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                defaultValue={s.progress}
+                className="py-1"
+                onBlur={(e) =>
+                  Number(e.target.value) !== s.progress &&
+                  run(stages().update({ progress: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }).eq("id", s.id))
+                }
+              />
+              <IconButton
+                title={t.tasks.setPeriod}
+                onClick={() => setDating(dating === s.id ? null : s.id)}
+              >
+                <CalendarDays size={14} />
+              </IconButton>
+              <IconButton
+                danger
+                title={a.delete}
+                onClick={() => window.confirm(a.confirmDelete) && run(stages().delete().eq("id", s.id))}
+              >
+                <Trash2 size={14} />
+              </IconButton>
+            </div>
+            {dating === s.id && (
+              <PeriodForm
+                t={t}
+                from={s.started_at}
+                to={s.finished_at}
+                onCancel={() => setDating(null)}
+                onSave={(started_at, finished_at) => {
+                  setDating(null);
+                  run(stages().update({ started_at, finished_at }).eq("id", s.id));
+                }}
+              />
+            )}
           </li>
         ))}
       </ul>
@@ -381,6 +427,53 @@ function StagesEditor({ projectId, t }: { projectId: string; t: Dictionary }) {
           <Plus size={16} /> {a.add}
         </Button>
       </form>
+    </div>
+  );
+}
+
+// From–to calendar fields for a stage.
+function PeriodForm({
+  t,
+  from,
+  to,
+  onSave,
+  onCancel,
+}: {
+  t: Dictionary;
+  from: string | null;
+  to: string | null;
+  onSave: (from: string | null, to: string | null) => void;
+  onCancel: () => void;
+}) {
+  const [range, setRange] = useState({ from: toDateInput(from), to: toDateInput(to) });
+  const invalid = !!range.from && !!range.to && range.to < range.from;
+
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-panel-2/60 p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={t.tasks.from}>
+          <Input
+            type="date"
+            value={range.from}
+            onChange={(e) => {
+              const v = e.target.value;
+              setRange({ from: v, to: range.to && v && range.to < v ? v : range.to });
+            }}
+          />
+        </Field>
+        <Field label={t.tasks.to}>
+          <Input type="date" value={range.to} min={range.from || undefined} onChange={(e) => setRange({ ...range, to: e.target.value })} />
+        </Field>
+      </div>
+      {invalid && <p className="mt-2 text-xs text-red-300">{t.tasks.endBeforeStart}</p>}
+      <div className="mt-3 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel}>
+          {t.adminUi.cancel}
+        </Button>
+        <Button disabled={invalid} onClick={() => onSave(range.from || null, range.to || null)}>
+          {t.adminUi.save}
+        </Button>
+      </div>
     </div>
   );
 }

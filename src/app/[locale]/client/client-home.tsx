@@ -15,12 +15,15 @@ import {
   prepareNotes,
   type Note,
 } from "@/components/site-notes";
+import { formatDateRange } from "../admin/data";
 import { MessageModal, NotesList, PhotoNotesModal, ThreadModal, type ClientPhoto } from "./photo-notes";
 
 type Stage = {
   id: string;
   title: string;
   status: "pending" | "in_progress" | "done";
+  started_at: string | null;
+  finished_at: string | null;
 };
 
 type Photo = ClientPhoto;
@@ -52,7 +55,7 @@ async function loadSite(userId: string): Promise<Site | null> {
     supabase.from("projects").select("name, address, progress").eq("id", access.project_id).single(),
     supabase
       .from("project_stages")
-      .select("id, title, status")
+      .select("id, title, status, started_at, finished_at")
       .eq("project_id", access.project_id)
       .order("position"),
     supabase
@@ -176,7 +179,12 @@ export function ClientHome({ locale, t }: { locale: Locale; t: Dictionary }) {
                   s.status === "done" ? "bg-olive-light" : s.status === "in_progress" ? "bg-gold" : "bg-line"
                 }`}
               />
-              <span className="flex-1 text-white">{s.title}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-white">{s.title}</span>
+                {(s.started_at || s.finished_at) && (
+                  <span className="block text-xs text-silver-dim">{formatDateRange(s.started_at, s.finished_at, locale)}</span>
+                )}
+              </span>
               <span className="text-xs text-silver-dim">{t.stageStatus[s.status]}</span>
             </li>
           ))}
