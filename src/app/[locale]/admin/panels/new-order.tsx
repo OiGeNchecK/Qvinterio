@@ -24,9 +24,9 @@ import {
 import { ORDER_CATEGORIES, type OrderCategory, type ProjectRef } from "../data";
 import type { ContactRef } from "./orders";
 
-type CatalogItem = { id: string; category: OrderCategory; name: string; unit: string; active: boolean };
+export type CatalogItem = { id: string; category: OrderCategory; name: string; unit: string; active: boolean };
 
-const CUSTOM = "__custom";
+export const CUSTOM = "__custom";
 const UNITS = ["Stk", "m", "m²", "m³", "kg", "t", "Paket", "Rolle", "Sack", "Palette"];
 
 // Containers a worker can ask for, with the unit picked by default; the
@@ -40,7 +40,7 @@ const CONTAINER_TYPES = [
 const CONTAINER_UNITS = ["m³", "Stk"];
 
 // The API returns at most 1000 rows per request, so the catalog is read in pages.
-async function loadCatalog() {
+export async function loadCatalog() {
   const supabase = createClient();
   const all: CatalogItem[] = [];
   for (let from = 0; ; from += 1000) {
@@ -58,8 +58,8 @@ async function loadCatalog() {
   }
 }
 
-type Line = { pick: string; text: string; quantity: string; unit: string };
-const emptyLine = (): Line => ({ pick: "", text: "", quantity: "1", unit: "Stk" });
+export type Line = { pick: string; text: string; quantity: string; unit: string };
+export const emptyLine = (): Line => ({ pick: "", text: "", quantity: "1", unit: "Stk" });
 
 // New order placed by the office: catalog items or free text. Workers get it
 // without the supplier field and with free text only (freeText); the office
@@ -95,11 +95,6 @@ export function NewOrderModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const options = (catalog.data ?? []).filter((c) => c.active && c.category === form.category);
-  const byId = new Map(catalog.data?.map((c) => [c.id, c]));
-  const containers = form.category === "container";
-  const setLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-
   function setCategory(category: OrderCategory) {
     setForm({ ...form, category });
     // Free text lines switch between typed items and the container list.
@@ -114,17 +109,7 @@ export function NewOrderModal({
   }
 
   async function save() {
-    const items = lines
-      .map((l) => {
-        const item = l.pick && l.pick !== CUSTOM ? byId.get(l.pick) : undefined;
-        return {
-          catalog_item_id: item?.id ?? null,
-          description: (item?.name ?? l.text).trim(),
-          quantity: Number(l.quantity.replace(",", ".")) || 1,
-          unit: item?.unit ?? l.unit,
-        };
-      })
-      .filter((i) => i.description);
+    const items = linesToItems(lines, catalog.data ?? []);
     if (!form.project_id || (!items.length && !form.note.trim())) return setError(a.orderNeedsSite);
     setBusy(true);
     setError(null);
@@ -218,74 +203,14 @@ export function NewOrderModal({
 
       <div className="mt-6">
         <div className="mb-2 text-xs text-silver-dim">{a.items}</div>
-        <div className="space-y-2">
-          {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 sm:grid-cols-[1fr_5rem_6rem_auto]">
-              <div className="col-span-3 space-y-2 sm:col-span-1">
-                {!freeText && (
-                  <Select value={l.pick} onChange={(e) => setLine(i, { pick: e.target.value })}>
-                    <option value="">{a.pickItem}</option>
-                    {options.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                    <option value={CUSTOM}>✎ {a.customItem}</option>
-                  </Select>
-                )}
-                {freeText && containers ? (
-                  <Select
-                    value={l.text}
-                    onChange={(e) =>
-                      setLine(i, {
-                        text: e.target.value,
-                        unit: CONTAINER_TYPES.find((c) => c.name === e.target.value)?.unit ?? l.unit,
-                      })
-                    }
-                  >
-                    <option value="">{a.pickContainer}</option>
-                    {CONTAINER_TYPES.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </Select>
-                ) : l.pick === CUSTOM && (
-                  <Input
-                    autoFocus={!freeText || i > 0}
-                    value={l.text}
-                    onChange={(e) => setLine(i, { text: e.target.value })}
-                    placeholder={a.customItemHint}
-                  />
-                )}
-              </div>
-              <Input inputMode="decimal" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
-              {l.pick && l.pick !== CUSTOM ? (
-                <Input value={byId.get(l.pick)?.unit ?? ""} disabled />
-              ) : (
-                <Select value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })}>
-                  {(freeText && containers ? CONTAINER_UNITS : UNITS).map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </Select>
-              )}
-              <IconButton
-                danger
-                className="mt-1"
-                disabled={lines.length === 1}
-                onClick={() => setLines(lines.filter((_, j) => j !== i))}
-                aria-label={a.delete}
-              >
-                <Trash2 size={14} />
-              </IconButton>
-            </div>
-          ))}
-        </div>
-        <Button variant="ghost" className="mt-3" onClick={() => setLines([...lines, newLine()])}>
-          <Plus size={16} /> {a.addLine}
-        </Button>
+        <ItemLines
+          t={t}
+          category={form.category}
+          freeText={freeText}
+          catalog={catalog.data ?? []}
+          lines={lines}
+          setLines={setLines}
+        />
       </div>
 
       <Field label={a.comment} className="mt-6">
@@ -303,6 +228,120 @@ export function NewOrderModal({
       </ModalActions>
     </Modal>
   );
+}
+
+// Item rows of an order: a catalog item or own text, quantity and unit. With
+// freeText there is no catalog, and containers come from a fixed list.
+export function ItemLines({
+  t,
+  category,
+  freeText = false,
+  catalog,
+  lines,
+  setLines,
+}: {
+  t: Dictionary;
+  category: OrderCategory;
+  freeText?: boolean;
+  catalog: CatalogItem[];
+  lines: Line[];
+  setLines: (lines: Line[]) => void;
+}) {
+  const a = t.adminUi;
+  const options = catalog.filter((c) => c.active && c.category === category);
+  const byId = new Map(catalog.map((c) => [c.id, c]));
+  const containers = category === "container";
+  const newLine = (): Line => (freeText ? { ...emptyLine(), pick: CUSTOM } : emptyLine());
+  const setLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+
+  return (
+    <>
+    <div className="space-y-2">
+      {lines.map((l, i) => (
+        <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 sm:grid-cols-[1fr_5rem_6rem_auto]">
+          <div className="col-span-3 space-y-2 sm:col-span-1">
+            {!freeText && (
+              <Select value={l.pick} onChange={(e) => setLine(i, { pick: e.target.value })}>
+                <option value="">{a.pickItem}</option>
+                {options.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value={CUSTOM}>✎ {a.customItem}</option>
+              </Select>
+            )}
+            {freeText && containers ? (
+              <Select
+                value={l.text}
+                onChange={(e) =>
+                  setLine(i, {
+                    text: e.target.value,
+                    unit: CONTAINER_TYPES.find((c) => c.name === e.target.value)?.unit ?? l.unit,
+                  })
+                }
+              >
+                <option value="">{a.pickContainer}</option>
+                {CONTAINER_TYPES.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            ) : l.pick === CUSTOM && (
+              <Input
+                autoFocus={!freeText || i > 0}
+                value={l.text}
+                onChange={(e) => setLine(i, { text: e.target.value })}
+                placeholder={a.customItemHint}
+              />
+            )}
+          </div>
+          <Input inputMode="decimal" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
+          {l.pick && l.pick !== CUSTOM ? (
+            <Input value={byId.get(l.pick)?.unit ?? ""} disabled />
+          ) : (
+            <Select value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })}>
+              {(freeText && containers ? CONTAINER_UNITS : UNITS).map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </Select>
+          )}
+          <IconButton
+            danger
+            className="mt-1"
+            disabled={lines.length === 1}
+            onClick={() => setLines(lines.filter((_, j) => j !== i))}
+            aria-label={a.delete}
+          >
+            <Trash2 size={14} />
+          </IconButton>
+        </div>
+      ))}
+    </div>
+    <Button variant="ghost" className="mt-3" onClick={() => setLines([...lines, newLine()])}>
+      <Plus size={16} /> {a.addLine}
+    </Button>
+    </>
+  );
+}
+
+// Turns the rows into order_items fields; empty rows are dropped.
+export function linesToItems(lines: Line[], catalog: CatalogItem[]) {
+  const byId = new Map(catalog.map((c) => [c.id, c]));
+  return lines
+    .map((l) => {
+      const item = l.pick && l.pick !== CUSTOM ? byId.get(l.pick) : undefined;
+      return {
+        catalog_item_id: item?.id ?? null,
+        description: (item?.name ?? l.text).trim(),
+        quantity: Number(l.quantity.replace(",", ".")) || 1,
+        unit: item?.unit ?? l.unit,
+      };
+    })
+    .filter((i) => i.description);
 }
 
 // List of materials, containers etc. that can be picked in orders.

@@ -35,7 +35,7 @@ import {
   type OrderStatus,
   type Person,
 } from "../data";
-import { CatalogModal, NewOrderModal } from "./new-order";
+import { CUSTOM, CatalogModal, ItemLines, NewOrderModal, linesToItems, loadCatalog, type Line } from "./new-order";
 
 export type Order = {
   id: string;
@@ -50,14 +50,17 @@ export type Order = {
   note: string | null;
   created_at: string;
   projects: { name: string } | null;
-  order_items: { id: string; description: string; quantity: number; unit: string }[];
+  order_items: OrderItem[];
 };
+
+// office = a line the office added when it adjusted the order.
+export type OrderItem = { id: string; description: string; quantity: number; unit: string; office: boolean };
 
 type OrderEvent = { id: number; actor_id: string | null; status: OrderStatus | null; note: string | null; created_at: string };
 export type ContactRef = { id: string; company: string | null; person: string | null };
 
 export const ORDER_SELECT =
-  "id, project_id, created_by, assignee_id, contact_id, category, status, needed_by, delivery_date, note, created_at, projects(name), order_items(id, description, quantity, unit)";
+  "id, project_id, created_by, assignee_id, contact_id, category, status, needed_by, delivery_date, note, created_at, projects(name), order_items(id, description, quantity, unit, office)";
 
 async function loadAll() {
   const supabase = createClient();
@@ -170,6 +173,12 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   );
 }
 
+// The office's adjusted lines when there are any, otherwise the original ones.
+export function shownItems(o: Pick<Order, "order_items">) {
+  const office = o.order_items.filter((i) => i.office);
+  return office.length ? office : o.order_items;
+}
+
 // Shared by the orders page and the overview.
 export function OrdersTable({
   orders,
@@ -227,7 +236,7 @@ export function OrdersTable({
             <td className="text-silver-dim">{t.orderCategory[o.category]}</td>
             <td>
               {o.order_items.length ? (
-                o.order_items.map((i) => (
+                shownItems(o).map((i) => (
                   <div key={i.id} className="text-xs">
                     {i.description} <span className="text-silver-dim">×{i.quantity} {i.unit}</span>
                   </div>
@@ -305,6 +314,14 @@ export function OrderModal({
     delivery_date: toDateInput(order.delivery_date),
   });
   const [comment, setComment] = useState("");
+  const catalog = useLoad(loadCatalog);
+  const original = order.order_items.filter((i) => !i.office);
+  const adjusted = order.order_items.filter((i) => i.office);
+  // The office edits a copy; the original lines stay as they were written.
+  const startLines = (adjusted.length ? adjusted : original).map(
+    (i): Line => ({ pick: CUSTOM, text: i.description, quantity: String(i.quantity), unit: i.unit }),
+  );
+  const [lines, setLines] = useState<Line[]>(startLines);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const byId = new Map(people.map((p) => [p.id, p]));
@@ -324,12 +341,23 @@ export function OrderModal({
     setBusy(true);
     setError(null);
     const supabase = createClient();
+    const items = linesToItems(lines, catalog.data ?? []);
+    const key = (list: { description: string; quantity: number; unit: string }[]) =>
+      JSON.stringify(list.map((i) => [i.description, Number(i.quantity), i.unit]));
+    const linesChanged = key(items) !== key(adjusted.length ? adjusted : original);
     try {
+      if (linesChanged) {
+        must(await supabase.from("order_items").delete().eq("order_id", order.id).eq("office", true));
+        if (items.length)
+          must(await supabase.from("order_items").insert(items.map((i) => ({ ...i, order_id: order.id, office: true }))));
+        must(await supabase.from("order_events").insert({ order_id: order.id, note: a.itemsAdjusted }));
+      }
       must(
         await supabase
           .from("orders")
           .update({
-            status: form.status,
+            // Adjusting a new order means the office has picked it up.
+            status: linesChanged && form.status === "new" ? "in_progress" : form.status,
             assignee_id: form.assignee_id || null,
             contact_id: form.contact_id || null,
             delivery_date: form.delivery_date || null,
@@ -350,7 +378,10 @@ export function OrderModal({
       <div className="grid gap-6 md:grid-cols-[1.3fr_1fr]">
         <div className="space-y-4">
           <div className="space-y-1 rounded-lg bg-panel-2 p-4 text-sm">
-            {order.order_items.map((i) => (
+            <div className="mb-2 text-xs text-silver-dim">
+              {a.originalRequest} · {personName(byId.get(order.created_by ?? ""))}
+            </div>
+            {original.map((i) => (
               <div key={i.id} className="flex justify-between gap-4">
                 <span className="text-silver">{i.description}</span>
                 <span className="whitespace-nowrap text-silver-dim">
@@ -421,6 +452,12 @@ export function OrderModal({
             ))}
           </ol>
         </div>
+      </div>
+      <div className="mt-6 rounded-xl border border-gold/40 bg-gold/5 p-4">
+        <h4 className="text-xs font-medium uppercase tracking-wider text-gold">{a.adjustItems}</h4>
+        <p className="mb-3 mt-1 text-xs text-silver-dim">{a.adjustItemsHint}</p>
+        <ItemLines t={t} category={order.category} catalog={catalog.data ?? []} lines={lines} setLines={setLines} />
+        <ErrorNote error={catalog.error} />
       </div>
       <ErrorNote error={error} />
       <ModalActions>

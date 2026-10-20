@@ -20,7 +20,7 @@ export type SiteOrder = {
   delivery_date: string | null;
   note: string | null;
   created_at: string;
-  order_items: { id: string; description: string; quantity: number; unit: string }[];
+  order_items: { id: string; description: string; quantity: number; unit: string; office: boolean }[];
 };
 
 type OrderEvent = { id: number; actor_id: string | null; status: OrderStatus | null; note: string | null; created_at: string };
@@ -34,7 +34,7 @@ export async function loadOrders(projectId: string, createdBy?: string) {
     await supabase
       .from("orders")
       .select(
-        "id, created_by, category, status, needed_by, delivery_date, note, created_at, order_items(id, description, quantity, unit)",
+        "id, created_by, category, status, needed_by, delivery_date, note, created_at, order_items(id, description, quantity, unit, office)",
       )
       .eq("project_id", projectId)
       .match(createdBy ? { created_by: createdBy } : {})
@@ -115,7 +115,7 @@ export function SiteOrders({
   );
 }
 
-// One order with its items, dates and status; the author may cancel it
+// One order with its items, dates and status; the author may delete it
 // while nobody has picked it up.
 export function OrderCard({
   order: o,
@@ -138,9 +138,12 @@ export function OrderCard({
   const date = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short" });
   const mine = o.created_by === me.id;
 
-  async function cancel() {
+  const original = o.order_items.filter((i) => !i.office);
+  const office = o.order_items.filter((i) => i.office);
+
+  async function remove() {
     if (!window.confirm(w.confirmCancel)) return;
-    const { error } = await createClient().from("orders").update({ status: "cancelled" }).eq("id", o.id);
+    const { error } = await createClient().from("orders").delete().eq("id", o.id);
     setError(error?.message ?? null);
     onChanged();
   }
@@ -155,7 +158,7 @@ export function OrderCard({
         <Badge tone={orderStatusTone(o.status)}>{t.orderStatus[o.status]}</Badge>
       </div>
       <div className="mt-3 space-y-1 text-sm">
-        {o.order_items.map((i) => (
+        {original.map((i) => (
           <div key={i.id} className="flex justify-between gap-4">
             <span className="text-silver">{i.description}</span>
             <span className="whitespace-nowrap text-silver-dim">
@@ -165,6 +168,19 @@ export function OrderCard({
         ))}
       </div>
       {o.note && <p className="mt-2 text-sm text-silver-dim">{o.note}</p>}
+      {office.length > 0 && (
+        <div className="mt-3 space-y-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-sm">
+          <div className="text-xs text-gold">{w.officeItems}</div>
+          {office.map((i) => (
+            <div key={i.id} className="flex justify-between gap-4">
+              <span className="text-silver">{i.description}</span>
+              <span className="whitespace-nowrap text-silver-dim">
+                {i.quantity} {i.unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         {o.needed_by && (
           <span className="text-gold">
@@ -184,7 +200,7 @@ export function OrderCard({
             <History size={13} /> {w.history}
           </button>
           {mine && o.status === "new" && (
-            <button onClick={cancel} className="rounded-md px-2 py-1.5 text-red-400 hover:underline">
+            <button onClick={remove} className="rounded-md px-2 py-1.5 text-red-400 hover:underline">
               {w.cancelOrder}
             </button>
           )}
