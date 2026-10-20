@@ -38,14 +38,14 @@ type Grant = {
 // until is the ISO end of access; grantId lets the dialog change it.
 type Credentials = { name: string; key: string; site: string; until: string; grantId: string };
 
-const DAY = 24 * 60 * 60 * 1000;
+export const DAY = 24 * 60 * 60 * 1000;
 
-function inDays(days: number) {
+export function inDays(days: number) {
   return new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
 }
 
 // End of the chosen day, so access lasts through it.
-function endOfDay(date: string) {
+export function endOfDay(date: string) {
   return new Date(`${date}T23:59:59`).toISOString();
 }
 
@@ -101,7 +101,7 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   async function remove(g: Grant) {
     if (!window.confirm(a.deleteAccessConfirm.replace("{name}", personName(people.get(g.client_id))))) return;
     try {
-      await callAdminUsers({ action: "client_delete", client_id: g.client_id });
+      await callAdminUsers({ action: "key_delete", client_id: g.client_id });
       setActionError(null);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
@@ -124,7 +124,7 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
     const client = people.get(g.client_id);
     if (!window.confirm(a.newKeyConfirm.replace("{name}", personName(client)))) return;
     try {
-      const res = await callAdminUsers({ action: "client_new_key", client_id: g.client_id });
+      const res = await callAdminUsers({ action: "key_new", client_id: g.client_id });
       setActionError(null);
       reload();
       setCredentials({ ...credentialsFor(g), key: res.key ?? "" });
@@ -343,19 +343,7 @@ function CredentialsModal({
   }
 
   const row = (key: string, label: string, value: string, big?: boolean) => (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-4 py-3">
-      <div className="min-w-0">
-        <div className="text-xs text-silver-dim">{label}</div>
-        <div className={`truncate ${big ? "font-mono text-xl tracking-wider text-gold" : "text-silver"}`}>
-          {value || "—"}
-        </div>
-      </div>
-      {value && (
-        <IconButton onClick={() => copy(key, value)} title={a.copy}>
-          {copied === key ? <Check size={14} /> : <Copy size={14} />}
-        </IconButton>
-      )}
-    </div>
+    <CopyRow label={label} value={value} big={big} copied={copied === key} onCopy={() => copy(key, value)} t={t} />
   );
 
   return (
@@ -383,5 +371,38 @@ function CredentialsModal({
         <Button onClick={onClose}>{a.done}</Button>
       </ModalActions>
     </Modal>
+  );
+}
+
+// A labelled value with a copy button, for login links and keys.
+export function CopyRow({
+  label,
+  value,
+  big,
+  copied,
+  onCopy,
+  t,
+}: {
+  label: string;
+  value: string;
+  big?: boolean;
+  copied: boolean;
+  onCopy: () => void;
+  t: Dictionary;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-xs text-silver-dim">{label}</div>
+        <div className={`truncate ${big ? "font-mono text-xl tracking-wider text-gold" : "text-silver"}`}>
+          {value || "—"}
+        </div>
+      </div>
+      {value && (
+        <IconButton onClick={onCopy} title={t.adminUi.copy}>
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+        </IconButton>
+      )}
+    </div>
   );
 }

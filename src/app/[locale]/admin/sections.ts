@@ -4,6 +4,7 @@ export const ADMIN_SECTIONS = [
   "contacts",
   "users",
   "access",
+  "workers",
   "portfolio",
   "services",
 ] as const;

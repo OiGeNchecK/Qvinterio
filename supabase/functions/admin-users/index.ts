@@ -1,7 +1,7 @@
 // Account management that needs the service key.
 // Admins: create a user with roles, set a user's password.
-// Staff (admin or manager): create a client access key bound to one site,
-// replace a client's key, or delete a client.
+// Staff (admin or manager): create key accounts (a client bound to one site,
+// or a worker on chosen sites), replace a key, or delete a key account.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ROLES = ["admin", "manager", "worker", "client"];
@@ -50,11 +50,31 @@ Deno.serve(async (req) => {
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = await req.json().catch(() => ({}));
 
-  // Only accounts that are nothing but clients may get a new key from staff.
-  async function isClientOnly(userId: string) {
+  // Staff may only touch clients and workers, never admins or managers.
+  async function isKeyAccount(userId: string) {
     const { data } = await admin.from("user_roles").select("role").eq("user_id", userId);
     const roles = (data ?? []).map((r: { role: string }) => r.role);
-    return roles.length > 0 && roles.every((r) => r === "client");
+    return roles.length > 0 && roles.every((r) => r === "client" || r === "worker");
+  }
+
+  async function createKeyAccount(name: string, role: string) {
+    const key = generateKey();
+    const { data, error } = await admin.auth.admin.createUser({
+      email: await keyEmail(key),
+      password: key,
+      email_confirm: true,
+      user_metadata: { full_name: name },
+    });
+    if (error) throw new Error(error.message);
+    const id = data.user.id;
+    const roleRes = await admin.from("user_roles").insert({ user_id: id, role });
+    const keyRes = await admin.from("client_keys").insert({ client_id: id, key });
+    const failed = roleRes.error ?? keyRes.error;
+    if (failed) {
+      await admin.auth.admin.deleteUser(id);
+      throw new Error(failed.message);
+    }
+    return { id, key };
   }
 
   // Staff can look the key up again later.
@@ -83,41 +103,52 @@ Deno.serve(async (req) => {
       const name = typeof body.full_name === "string" ? body.full_name.trim() : "";
       if (!projectId || !expiresAt || !name) return json({ error: "Name, site and end date are required" }, 400);
 
-      const key = generateKey();
-      const { data, error } = await admin.auth.admin.createUser({
-        email: await keyEmail(key),
-        password: key,
-        email_confirm: true,
-        user_metadata: { full_name: name },
-      });
-      if (error) return json({ error: error.message }, 400);
-      const clientId = data.user.id;
-
-      const role = await admin.from("user_roles").insert({ user_id: clientId, role: "client" });
+      const { id, key } = await createKeyAccount(name, "client");
       const grant = await admin
         .from("client_access")
-        .insert({ project_id: projectId, client_id: clientId, expires_at: expiresAt, created_by: me.user.id })
+        .insert({ project_id: projectId, client_id: id, expires_at: expiresAt, created_by: me.user.id })
         .select("id")
         .single();
-      const saved = await admin.from("client_keys").insert({ client_id: clientId, key });
-      const failed = role.error ?? grant.error ?? saved.error;
-      if (failed) {
-        await admin.auth.admin.deleteUser(clientId);
-        return json({ error: failed.message }, 400);
+      if (grant.error) {
+        await admin.auth.admin.deleteUser(id);
+        return json({ error: grant.error.message }, 400);
       }
-      return json({ id: clientId, key, grant_id: grant.data?.id });
+      return json({ id, key, grant_id: grant.data.id });
     }
 
-    if (body.action === "client_new_key") {
+    if (body.action === "worker_key") {
+      const name = typeof body.full_name === "string" ? body.full_name.trim() : "";
+      const projectIds: string[] = Array.isArray(body.project_ids)
+        ? body.project_ids.filter((p: unknown) => typeof p === "string")
+        : [];
+      const expiresAt = typeof body.expires_at === "string" && body.expires_at ? body.expires_at : null;
+      if (!name) return json({ error: "Name is required" }, 400);
+
+      const { id, key } = await createKeyAccount(name, "worker");
+      const access = await admin
+        .from("worker_access")
+        .insert({ user_id: id, expires_at: expiresAt, created_by: me.user.id });
+      const members = projectIds.length
+        ? await admin.from("project_members").insert(projectIds.map((project_id) => ({ project_id, user_id: id })))
+        : { error: null };
+      const failed = access.error ?? members.error;
+      if (failed) {
+        await admin.auth.admin.deleteUser(id);
+        return json({ error: failed.message }, 400);
+      }
+      return json({ id, key });
+    }
+
+    if (body.action === "key_new" || body.action === "client_new_key") {
       if (typeof body.client_id !== "string") return json({ error: "client_id is required" }, 400);
-      if (!(await isClientOnly(body.client_id))) return json({ error: "Only client accounts" }, 400);
+      if (!(await isKeyAccount(body.client_id))) return json({ error: "Only client and worker accounts" }, 400);
       return json({ id: body.client_id, ...(await newClientKey(body.client_id)) });
     }
 
-    // Each key client has one site, so removing the access removes the account.
-    if (body.action === "client_delete") {
+    // A key account exists only for its access, so removing the access removes the account.
+    if (body.action === "key_delete" || body.action === "client_delete") {
       if (typeof body.client_id !== "string") return json({ error: "client_id is required" }, 400);
-      if (!(await isClientOnly(body.client_id))) return json({ error: "Only client accounts" }, 400);
+      if (!(await isKeyAccount(body.client_id))) return json({ error: "Only client and worker accounts" }, 400);
       const { error } = await admin.auth.admin.deleteUser(body.client_id);
       if (error) return json({ error: error.message }, 400);
       return json({ id: body.client_id });

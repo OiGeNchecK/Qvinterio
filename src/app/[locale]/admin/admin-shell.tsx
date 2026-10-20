@@ -8,6 +8,7 @@ import {
   Contact,
   Globe,
   Hammer,
+  HardHat,
   Images,
   KeyRound,
   LayoutDashboard,
@@ -32,6 +33,7 @@ const ICONS: Record<AdminSection | "overview", LucideIcon> = {
   contacts: Contact,
   users: Users,
   access: KeyRound,
+  workers: HardHat,
   portfolio: Images,
   services: Hammer,
 };

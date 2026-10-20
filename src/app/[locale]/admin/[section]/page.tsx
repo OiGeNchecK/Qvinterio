@@ -9,6 +9,7 @@ import { PortfolioSection } from "../panels/portfolio";
 import { ProjectsSection } from "../panels/projects";
 import { ServicesSection } from "../panels/services";
 import { UsersSection } from "../panels/users";
+import { WorkerAccessSection } from "../panels/worker-access";
 
 export const dynamicParams = false;
 
@@ -32,6 +33,8 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
       return <UsersSection t={t} />;
     case "access":
       return <AccessSection locale={locale} t={t} />;
+    case "workers":
+      return <WorkerAccessSection locale={locale} t={t} />;
     case "portfolio":
       return <PortfolioSection locale={locale} t={t} />;
     case "services":
