@@ -29,33 +29,49 @@ type CatalogItem = { id: string; category: OrderCategory; name: string; unit: st
 const CUSTOM = "__custom";
 const UNITS = ["Stk", "m", "m²", "m³", "kg", "t", "Paket", "Rolle", "Sack", "Palette"];
 
+// The API returns at most 1000 rows per request, so the catalog is read in pages.
 async function loadCatalog() {
-  return must<CatalogItem[]>(
-    await createClient().from("catalog_items").select("id, category, name, unit, active").order("category").order("name"),
-  );
+  const supabase = createClient();
+  const all: CatalogItem[] = [];
+  for (let from = 0; ; from += 1000) {
+    const page = must<CatalogItem[]>(
+      await supabase
+        .from("catalog_items")
+        .select("id, category, name, unit, active")
+        .order("category")
+        .order("name")
+        .order("id")
+        .range(from, from + 999),
+    );
+    all.push(...page);
+    if (page.length < 1000) return all;
+  }
 }
 
 type Line = { pick: string; text: string; quantity: string; unit: string };
 const emptyLine = (): Line => ({ pick: "", text: "", quantity: "1", unit: "Stk" });
 
-// New order placed by the office: catalog items or free text.
+// New order placed by the office or, without the supplier field, by a
+// worker for one of their sites: catalog items or free text.
 export function NewOrderModal({
   t,
   projects,
   contacts,
+  projectId = "",
   onClose,
   onSaved,
 }: {
   t: Dictionary;
   projects: ProjectRef[];
-  contacts: ContactRef[];
+  contacts?: ContactRef[];
+  projectId?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const a = t.adminUi;
   const catalog = useLoad(loadCatalog);
   const [form, setForm] = useState({
-    project_id: "",
+    project_id: projectId,
     category: "material" as OrderCategory,
     contact_id: "",
     needed_by: "",
@@ -136,16 +152,18 @@ export function NewOrderModal({
             ))}
           </Select>
         </Field>
-        <Field label={a.supplier}>
-          <Select value={form.contact_id} onChange={(e) => setForm({ ...form, contact_id: e.target.value })}>
-            <option value="">—</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {[c.company, c.person].filter(Boolean).join(" · ")}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {contacts && (
+          <Field label={a.supplier}>
+            <Select value={form.contact_id} onChange={(e) => setForm({ ...form, contact_id: e.target.value })}>
+              <option value="">—</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {[c.company, c.person].filter(Boolean).join(" · ")}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label={a.neededBy}>
           <Input type="date" value={form.needed_by} onChange={(e) => setForm({ ...form, needed_by: e.target.value })} />
         </Field>
@@ -155,8 +173,8 @@ export function NewOrderModal({
         <div className="mb-2 text-xs text-silver-dim">{a.items}</div>
         <div className="space-y-2">
           {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-[1fr_5rem_6rem_auto] items-start gap-2">
-              <div className="space-y-2">
+            <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 sm:grid-cols-[1fr_5rem_6rem_auto]">
+              <div className="col-span-3 space-y-2 sm:col-span-1">
                 <Select value={l.pick} onChange={(e) => setLine(i, { pick: e.target.value })}>
                   <option value="">{a.pickItem}</option>
                   {options.map((c) => (
