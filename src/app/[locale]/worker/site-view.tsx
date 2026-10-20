@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Camera, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Camera, History, ShoppingCart } from "lucide-react";
 import { ProgressBar } from "@/components/ui";
 import type { Dictionary, Locale } from "@/i18n";
+import { SiteHistory } from "./site-history";
 import { SiteOrders } from "./site-orders";
 import { SitePhotos } from "./site-photos";
 import type { WorkerSite } from "./worker-home";
 
-type Tab = "orders" | "photos";
+type Tab = "orders" | "photos" | "history";
 
-// One site of the worker: its orders and photos.
+// One site of the worker: ordering, photos and their own history.
 export function SiteView({
   site,
   locale,
@@ -26,8 +27,9 @@ export function SiteView({
   const w = t.worker;
   const [tab, setTab] = useState<Tab>("orders");
   const tabs = [
-    { key: "orders" as const, label: w.orders, Icon: ShoppingCart },
+    { key: "orders" as const, label: w.newOrder, Icon: ShoppingCart },
     { key: "photos" as const, label: w.photos, Icon: Camera },
+    { key: "history" as const, label: w.history, Icon: History },
   ];
 
   return (
@@ -52,7 +54,7 @@ export function SiteView({
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm transition ${
+            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm sm:px-4 transition ${
               tab === key ? "border-gold text-gold" : "border-transparent text-silver-dim hover:text-silver"
             }`}
           >
@@ -61,11 +63,9 @@ export function SiteView({
         ))}
       </div>
 
-      {tab === "orders" ? (
-        <SiteOrders site={site} locale={locale} t={t} onChanged={onChanged} />
-      ) : (
-        <SitePhotos site={site} locale={locale} t={t} />
-      )}
+      {tab === "orders" && <SiteOrders site={site} locale={locale} t={t} onChanged={onChanged} />}
+      {tab === "photos" && <SitePhotos site={site} locale={locale} t={t} />}
+      {tab === "history" && <SiteHistory site={site} locale={locale} t={t} onChanged={onChanged} />}
     </div>
   );
 }

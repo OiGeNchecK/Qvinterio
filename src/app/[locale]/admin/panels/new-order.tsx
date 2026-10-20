@@ -51,13 +51,15 @@ async function loadCatalog() {
 type Line = { pick: string; text: string; quantity: string; unit: string };
 const emptyLine = (): Line => ({ pick: "", text: "", quantity: "1", unit: "Stk" });
 
-// New order placed by the office or, without the supplier field, by a
-// worker for one of their sites: catalog items or free text.
+// New order placed by the office: catalog items or free text. Workers get it
+// without the supplier field and with free text only (freeText); the office
+// then orders the concrete items.
 export function NewOrderModal({
   t,
   projects,
   contacts,
   projectId = "",
+  freeText = false,
   onClose,
   onSaved,
 }: {
@@ -65,11 +67,13 @@ export function NewOrderModal({
   projects: ProjectRef[];
   contacts?: ContactRef[];
   projectId?: string;
+  freeText?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const a = t.adminUi;
-  const catalog = useLoad(loadCatalog);
+  const catalog = useLoad(freeText ? async () => [] as CatalogItem[] : loadCatalog);
+  const newLine = (): Line => (freeText ? { ...emptyLine(), pick: CUSTOM } : emptyLine());
   const [form, setForm] = useState({
     project_id: projectId,
     category: "material" as OrderCategory,
@@ -77,7 +81,7 @@ export function NewOrderModal({
     needed_by: "",
     note: "",
   });
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [lines, setLines] = useState<Line[]>(() => [newLine()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,18 +179,20 @@ export function NewOrderModal({
           {lines.map((l, i) => (
             <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 sm:grid-cols-[1fr_5rem_6rem_auto]">
               <div className="col-span-3 space-y-2 sm:col-span-1">
-                <Select value={l.pick} onChange={(e) => setLine(i, { pick: e.target.value })}>
-                  <option value="">{a.pickItem}</option>
-                  {options.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                  <option value={CUSTOM}>✎ {a.customItem}</option>
-                </Select>
+                {!freeText && (
+                  <Select value={l.pick} onChange={(e) => setLine(i, { pick: e.target.value })}>
+                    <option value="">{a.pickItem}</option>
+                    {options.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                    <option value={CUSTOM}>✎ {a.customItem}</option>
+                  </Select>
+                )}
                 {l.pick === CUSTOM && (
                   <Input
-                    autoFocus
+                    autoFocus={!freeText || i > 0}
                     value={l.text}
                     onChange={(e) => setLine(i, { text: e.target.value })}
                     placeholder={a.customItemHint}
@@ -217,7 +223,7 @@ export function NewOrderModal({
             </div>
           ))}
         </div>
-        <Button variant="ghost" className="mt-3" onClick={() => setLines([...lines, emptyLine()])}>
+        <Button variant="ghost" className="mt-3" onClick={() => setLines([...lines, newLine()])}>
           <Plus size={16} /> {a.addLine}
         </Button>
       </div>

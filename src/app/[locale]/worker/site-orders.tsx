@@ -11,7 +11,7 @@ import { orderStatusTone, personName, type OrderCategory, type OrderStatus } fro
 import { NewOrderModal } from "../admin/panels/new-order";
 import type { WorkerSite } from "./worker-home";
 
-type SiteOrder = {
+export type SiteOrder = {
   id: string;
   created_by: string | null;
   category: OrderCategory;
@@ -24,9 +24,11 @@ type SiteOrder = {
 };
 
 type OrderEvent = { id: number; actor_id: string | null; status: OrderStatus | null; note: string | null; created_at: string };
-type Profile = { id: string; full_name: string; email: string | null };
+export type Profile = { id: string; full_name: string; email: string | null };
 
-async function loadOrders(projectId: string) {
+const OPEN: OrderStatus[] = ["new", "in_progress", "ordered"];
+
+export async function loadOrders(projectId: string, createdBy?: string) {
   const supabase = createClient();
   const orders = must<SiteOrder[]>(
     await supabase
@@ -35,6 +37,7 @@ async function loadOrders(projectId: string) {
         "id, created_by, category, status, needed_by, delivery_date, note, created_at, order_items(id, description, quantity, unit)",
       )
       .eq("project_id", projectId)
+      .match(createdBy ? { created_by: createdBy } : {})
       .order("created_at", { ascending: false })
       .limit(200),
   );
@@ -45,7 +48,7 @@ async function loadOrders(projectId: string) {
   return { orders, people: new Map(people.map((p) => [p.id, p])) };
 }
 
-// Order history of one site, newest first, and the order form.
+// The order form and the site's open orders, so nothing is ordered twice.
 export function SiteOrders({
   site,
   locale,
@@ -58,23 +61,14 @@ export function SiteOrders({
   onChanged: () => void;
 }) {
   const w = t.worker;
-  const a = t.adminUi;
-  const me = useUser();
   const { data, error, reload } = useLoad(() => loadOrders(site.id));
   const [ordering, setOrdering] = useState(false);
   const [sent, setSent] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short", timeStyle: "short" });
-  const date = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short" });
-
-  async function cancel(o: SiteOrder) {
-    if (!window.confirm(w.confirmCancel)) return;
-    const { error } = await createClient().from("orders").update({ status: "cancelled" }).eq("id", o.id);
-    setActionError(error?.message ?? null);
+  const changed = () => {
     reload();
     onChanged();
-  }
+  };
+  const open = data?.orders.filter((o) => OPEN.includes(o.status)) ?? [];
 
   return (
     <div className="space-y-4">
@@ -85,7 +79,7 @@ export function SiteOrders({
             setOrdering(true);
           }}
         >
-          <Plus size={16} /> {w.newOrder}
+          <Plus size={16} /> {t.adminUi.newOrder}
         </Button>
       </div>
       {sent && (
@@ -93,63 +87,16 @@ export function SiteOrders({
           {w.orderSent}
         </p>
       )}
-      <ErrorNote error={error ?? actionError} />
+      <ErrorNote error={error} />
 
-      {data && !data.orders.length && (
-        <p className="rounded-xl border border-line bg-panel/70 px-4 py-6 text-center text-sm text-silver-dim">{w.noOrders}</p>
+      <h2 className="pt-2 text-xs font-medium uppercase tracking-wider text-gold">{w.openOnSite}</h2>
+      {data && !open.length && (
+        <p className="rounded-xl border border-line bg-panel/70 px-4 py-6 text-center text-sm text-silver-dim">{w.noOpenOrders}</p>
       )}
       <ul className="space-y-3">
-        {data?.orders.map((o) => {
-          const mine = o.created_by === me.id;
-          return (
-            <li key={o.id} className="rounded-xl border border-line bg-panel/80 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="text-xs text-silver-dim">
-                  {dateTime.format(new Date(o.created_at))} · {t.orderCategory[o.category]} ·{" "}
-                  {mine ? w.byMe : personName(data.people.get(o.created_by ?? ""))}
-                </div>
-                <Badge tone={orderStatusTone(o.status)}>{t.orderStatus[o.status]}</Badge>
-              </div>
-              <div className="mt-3 space-y-1 text-sm">
-                {o.order_items.map((i) => (
-                  <div key={i.id} className="flex justify-between gap-4">
-                    <span className="text-silver">{i.description}</span>
-                    <span className="whitespace-nowrap text-silver-dim">
-                      {i.quantity} {i.unit}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {o.note && <p className="mt-2 text-sm text-silver-dim">{o.note}</p>}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-                {o.needed_by && (
-                  <span className="text-gold">
-                    {a.neededBy} {date.format(new Date(o.needed_by))}
-                  </span>
-                )}
-                {o.delivery_date && (
-                  <span className="text-emerald-300">
-                    {w.deliveryOn} {date.format(new Date(o.delivery_date))}
-                  </span>
-                )}
-                <span className="ml-auto flex gap-3">
-                  <button
-                    onClick={() => setOpenId(openId === o.id ? null : o.id)}
-                    className="inline-flex items-center gap-1 text-silver-dim hover:text-gold"
-                  >
-                    <History size={13} /> {w.history}
-                  </button>
-                  {mine && o.status === "new" && (
-                    <button onClick={() => cancel(o)} className="text-red-400 hover:underline">
-                      {w.cancelOrder}
-                    </button>
-                  )}
-                </span>
-              </div>
-              {openId === o.id && <OrderHistory orderId={o.id} locale={locale} t={t} />}
-            </li>
-          );
-        })}
+        {open.map((o) => (
+          <OrderCard key={o.id} order={o} people={data?.people ?? new Map()} locale={locale} t={t} onChanged={changed} />
+        ))}
       </ul>
 
       {ordering && (
@@ -157,15 +104,96 @@ export function SiteOrders({
           t={t}
           projects={[site]}
           projectId={site.id}
+          freeText
           onClose={() => setOrdering(false)}
           onSaved={() => {
             setSent(true);
-            reload();
-            onChanged();
+            changed();
           }}
         />
       )}
     </div>
+  );
+}
+
+// One order with its items, dates and status; the author may cancel it
+// while nobody has picked it up.
+export function OrderCard({
+  order: o,
+  people,
+  locale,
+  t,
+  onChanged,
+}: {
+  order: SiteOrder;
+  people: Map<string, Profile>;
+  locale: Locale;
+  t: Dictionary;
+  onChanged: () => void;
+}) {
+  const w = t.worker;
+  const me = useUser();
+  const [showHistory, setShowHistory] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short", timeStyle: "short" });
+  const date = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short" });
+  const mine = o.created_by === me.id;
+
+  async function cancel() {
+    if (!window.confirm(w.confirmCancel)) return;
+    const { error } = await createClient().from("orders").update({ status: "cancelled" }).eq("id", o.id);
+    setError(error?.message ?? null);
+    onChanged();
+  }
+
+  return (
+    <li className="rounded-xl border border-line bg-panel/80 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="text-xs text-silver-dim">
+          {dateTime.format(new Date(o.created_at))} · {t.orderCategory[o.category]} ·{" "}
+          {mine ? w.byMe : personName(people.get(o.created_by ?? ""))}
+        </div>
+        <Badge tone={orderStatusTone(o.status)}>{t.orderStatus[o.status]}</Badge>
+      </div>
+      <div className="mt-3 space-y-1 text-sm">
+        {o.order_items.map((i) => (
+          <div key={i.id} className="flex justify-between gap-4">
+            <span className="text-silver">{i.description}</span>
+            <span className="whitespace-nowrap text-silver-dim">
+              {i.quantity} {i.unit}
+            </span>
+          </div>
+        ))}
+      </div>
+      {o.note && <p className="mt-2 text-sm text-silver-dim">{o.note}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        {o.needed_by && (
+          <span className="text-gold">
+            {t.adminUi.neededBy} {date.format(new Date(o.needed_by))}
+          </span>
+        )}
+        {o.delivery_date && (
+          <span className="text-emerald-300">
+            {w.deliveryOn} {date.format(new Date(o.delivery_date))}
+          </span>
+        )}
+        <span className="ml-auto flex gap-3">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="inline-flex items-center gap-1 text-silver-dim hover:text-gold"
+          >
+            <History size={13} /> {w.history}
+          </button>
+          {mine && o.status === "new" && (
+            <button onClick={cancel} className="text-red-400 hover:underline">
+              {w.cancelOrder}
+            </button>
+          )}
+        </span>
+      </div>
+      <ErrorNote error={error} />
+      {showHistory && <OrderHistory orderId={o.id} locale={locale} t={t} />}
+    </li>
   );
 }
 

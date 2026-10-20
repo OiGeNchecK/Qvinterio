@@ -279,6 +279,12 @@ const de = {
     photosHint: "Fotos mit „Für den Bauherrn sichtbar“ erscheinen auf der Seite des Bauherrn.",
     confirmDeletePhoto: "Dieses Foto löschen?",
     siteNotFound: "Diese Baustelle ist Ihnen nicht zugeordnet.",
+    openOnSite: "Offene Bestellungen dieser Baustelle",
+    noOpenOrders: "Keine offenen Bestellungen.",
+    historyHint: "Alles, was Sie auf dieser Baustelle bestellt und hochgeladen haben.",
+    noHistory: "Sie haben hier noch nichts bestellt oder hochgeladen.",
+    photosUploaded: "{n} Foto(s) hochgeladen",
+    visibleCount: "{n} für den Bauherrn sichtbar",
   },
   client: {
     title: "Meine Baustelle",
