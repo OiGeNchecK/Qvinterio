@@ -1,11 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { MapPin, PenLine } from "lucide-react";
+import { Button } from "@/components/button";
 import { Card, ProgressBar } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/lib/auth";
 import { dateLocale, type Dictionary, type Locale } from "@/i18n";
+import {
+  NOTE_SELECT,
+  loadUnreadNoteIds,
+  markNoteRead,
+  prepareNotes,
+  type Note,
+} from "@/components/site-notes";
+import { MessageModal, NotesList, PhotoNotesModal, ThreadModal, type ClientPhoto } from "./photo-notes";
 
 type Stage = {
   id: string;
@@ -13,9 +23,10 @@ type Stage = {
   status: "pending" | "in_progress" | "done";
 };
 
-type Photo = { id: string; caption: string | null; taken_at: string; url?: string };
+type Photo = ClientPhoto;
 
 type Site = {
+  projectId: string;
   expiresAt: string;
   project: { name: string; address: string | null; progress: number } | null;
   stages: Stage[];
@@ -62,6 +73,7 @@ async function loadSite(userId: string): Promise<Site | null> {
   const urlByPath = new Map(signed.map((s) => [s.path, s.signedUrl]));
 
   return {
+    projectId: access.project_id,
     expiresAt: access.expires_at,
     project,
     stages: (stages ?? []) as Stage[],
@@ -69,13 +81,51 @@ async function loadSite(userId: string): Promise<Site | null> {
   };
 }
 
+async function loadNotes(projectId: string) {
+  const [{ data }, unread] = await Promise.all([
+    createClient()
+      .from("client_notes")
+      .select(NOTE_SELECT)
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .overrideTypes<Note[], { merge: false }>(),
+    loadUnreadNoteIds(),
+  ]);
+  return { notes: prepareNotes(data ?? []), unread };
+}
+
 export function ClientHome({ locale, t }: { locale: Locale; t: Dictionary }) {
   const user = useUser();
   const [site, setSite] = useState<Site | null | undefined>(undefined);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [unread, setUnread] = useState<Set<string>>(new Set());
+  const [openPhoto, setOpenPhoto] = useState<{ photo: Photo; noteId?: string } | null>(null);
+  const [openNoteId, setOpenNoteId] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const projectId = site?.projectId;
 
   useEffect(() => {
     loadSite(user.id).then(setSite);
   }, [user.id]);
+
+  const reloadNotes = useCallback(() => {
+    if (!projectId) return;
+    loadNotes(projectId).then((r) => {
+      setNotes(r.notes);
+      setUnread(r.unread);
+    });
+  }, [projectId]);
+  useEffect(reloadNotes, [reloadNotes]);
+
+  const onSeen = useCallback(
+    (id: string) => {
+      if (!unread.has(id)) return;
+      markNoteRead(id);
+      setUnread((prev) => new Set([...prev].filter((x) => x !== id)));
+    },
+    [unread],
+  );
 
   if (site === undefined) return null;
   if (site === null) {
@@ -88,6 +138,15 @@ export function ClientHome({ locale, t }: { locale: Locale; t: Dictionary }) {
 
   const dateFormat = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "medium" });
   const progress = site.project?.progress ?? 0;
+  const photoById = new Map(site.photos.map((p) => [p.id, p]));
+  const pinCount = (photoId: string) => notes.filter((n) => n.photo_id === photoId).length;
+  const openNote = notes.find((n) => n.id === openNoteId);
+
+  function open(note: Note) {
+    const photo = note.photo_id ? photoById.get(note.photo_id) : undefined;
+    if (photo) setOpenPhoto({ photo, noteId: note.id });
+    else setOpenNoteId(note.id);
+  }
 
   return (
     <div className="space-y-8">
@@ -125,25 +184,88 @@ export function ClientHome({ locale, t }: { locale: Locale; t: Dictionary }) {
       </section>
 
       <section>
-        <h2 className="mb-4 font-medium text-white">{t.client.photos}</h2>
+        <h2 className="mb-1 font-medium text-white">{t.client.photos}</h2>
+        {site.photos.length > 0 && <p className="mb-4 text-sm text-silver-dim">{t.notes.gridHint}</p>}
         {!site.photos.length ? (
           <p className="text-sm text-silver-dim">{t.client.noPhotos}</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {site.photos.map((p) => (
-              <figure key={p.id} className="overflow-hidden rounded-xl border border-line bg-panel">
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setOpenPhoto({ photo: p })}
+                className="overflow-hidden rounded-xl border border-line bg-panel text-left transition hover:border-gold/60"
+              >
                 <div className="relative aspect-square bg-panel-2">
                   {p.url && <Image src={p.url} alt={p.caption ?? ""} fill sizes="25vw" className="object-cover" />}
+                  {pinCount(p.id) > 0 && (
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink/80 px-2 py-0.5 text-xs text-gold">
+                      <MapPin size={12} /> {pinCount(p.id)}
+                    </span>
+                  )}
                 </div>
-                <figcaption className="px-3 py-2 text-xs text-silver-dim">
+                <div className="px-3 py-2 text-xs text-silver-dim">
                   {dateFormat.format(new Date(p.taken_at))}
                   {p.caption ? ` · ${p.caption}` : ""}
-                </figcaption>
-              </figure>
+                </div>
+              </button>
             ))}
           </div>
         )}
       </section>
+
+      <section>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-medium text-white">{t.notes.listTitle}</h2>
+          <Button onClick={() => (setSent(false), setWriting(true))}>
+            <PenLine size={16} /> {t.notes.writeMessage}
+          </Button>
+        </div>
+        {sent && (
+          <p className="mb-3 rounded-lg border border-olive/60 bg-olive/15 px-3 py-2 text-sm text-olive-light">
+            {t.notes.sentHint}
+          </p>
+        )}
+        <NotesList notes={notes} photos={photoById} unread={unread} t={t} locale={locale} onOpen={open} />
+      </section>
+
+      {openPhoto && (
+        <PhotoNotesModal
+          photo={openPhoto.photo}
+          projectId={site.projectId}
+          notes={notes}
+          initialNoteId={openPhoto.noteId}
+          unread={unread}
+          t={t}
+          locale={locale}
+          onChanged={reloadNotes}
+          onSeen={onSeen}
+          onClose={() => setOpenPhoto(null)}
+        />
+      )}
+      {openNote && (
+        <ThreadModal
+          note={openNote}
+          t={t}
+          locale={locale}
+          onChanged={reloadNotes}
+          onSeen={onSeen}
+          onClose={() => setOpenNoteId(null)}
+        />
+      )}
+      {writing && (
+        <MessageModal
+          projectId={site.projectId}
+          t={t}
+          onClose={() => setWriting(false)}
+          onSent={() => {
+            setWriting(false);
+            setSent(true);
+            reloadNotes();
+          }}
+        />
+      )}
     </div>
   );
 }

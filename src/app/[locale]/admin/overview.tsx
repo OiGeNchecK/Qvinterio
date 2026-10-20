@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, HardHat, KeyRound, ShoppingCart, Truck, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Building2, HardHat, KeyRound, MessageSquare, ShoppingCart, Truck, X } from "lucide-react";
 import { ProgressBar } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import type { Dictionary, Locale } from "@/i18n";
@@ -15,7 +16,7 @@ type View = "new" | "open" | "projects" | null;
 
 async function loadAll() {
   const supabase = createClient();
-  const [orders, projects, people, access, contacts] = await Promise.all([
+  const [orders, projects, people, access, contacts, notes] = await Promise.all([
     supabase
       .from("orders")
       .select(ORDER_SELECT)
@@ -30,6 +31,7 @@ async function loadAll() {
       .is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()),
     supabase.from("contacts").select("id, company, person").order("company"),
+    supabase.from("client_notes").select("id", { count: "exact", head: true }).eq("status", "open"),
   ]);
   return {
     openOrders: must<Order[]>(orders),
@@ -37,6 +39,7 @@ async function loadAll() {
     people,
     activeAccess: access.count ?? 0,
     contacts: must<ContactRef[]>(contacts),
+    openNotes: notes.count ?? 0,
   };
 }
 
@@ -44,6 +47,7 @@ export function AdminOverview({ locale, t }: { locale: Locale; t: Dictionary }) 
   const { data, error, reload } = useLoad(loadAll);
   const [view, setView] = useState<View>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const router = useRouter();
   const a = t.adminUi;
 
   const newOrders = data?.openOrders.filter((o) => o.status === "new") ?? [];
@@ -74,7 +78,7 @@ export function AdminOverview({ locale, t }: { locale: Locale; t: Dictionary }) 
       <SectionHeader title={t.admin.sections.overview} />
       <ErrorNote error={error} />
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <StatCard
           icon={<ShoppingCart size={24} />}
           value={data ? newOrders.length : "–"}
@@ -95,6 +99,12 @@ export function AdminOverview({ locale, t }: { locale: Locale; t: Dictionary }) 
           label={t.admin.activeProjects}
           active={view === "projects"}
           onClick={() => toggle("projects")}
+        />
+        <StatCard
+          icon={<MessageSquare size={24} />}
+          value={data?.openNotes ?? "–"}
+          label={t.notes.openCount}
+          onClick={() => router.push(`/${locale}/admin/notes/`)}
         />
         <StatCard icon={<HardHat size={24} />} value={data ? team.length : "–"} label={a.teamCount} />
         <StatCard icon={<KeyRound size={24} />} value={data?.activeAccess ?? "–"} label={a.activeAccess} />

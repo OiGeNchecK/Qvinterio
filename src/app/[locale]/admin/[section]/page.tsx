@@ -4,6 +4,7 @@ import { Panel, SectionHeader } from "../kit";
 import { ADMIN_SECTIONS, type AdminSection } from "../sections";
 import { AccessSection } from "../panels/access";
 import { ContactsSection } from "../panels/contacts";
+import { NotesSection } from "../panels/notes";
 import { OrdersSection } from "../panels/orders";
 import { PortfolioSection } from "../panels/portfolio";
 import { ProjectsSection } from "../panels/projects";
@@ -25,6 +26,8 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
   switch (section as AdminSection) {
     case "orders":
       return <OrdersSection locale={locale} t={t} />;
+    case "notes":
+      return <NotesSection locale={locale} t={t} />;
     case "projects":
       return <ProjectsSection locale={locale} t={t} />;
     case "contacts":

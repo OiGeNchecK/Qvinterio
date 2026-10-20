@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   ShoppingCart,
   Users,
   X,
@@ -23,12 +24,14 @@ import { Logo } from "@/components/logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/lib/auth";
+import { useUnreadCount } from "@/components/site-notes";
 import type { Dictionary, Locale } from "@/i18n";
 import type { AdminSection } from "./sections";
 
 const ICONS: Record<AdminSection | "overview", LucideIcon> = {
   overview: LayoutDashboard,
   orders: ShoppingCart,
+  notes: MessageSquare,
   projects: Building2,
   contacts: Contact,
   users: Users,
@@ -54,6 +57,7 @@ export function AdminShell({
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const unread = useUnreadCount();
 
   const items = (["overview", ...sections] as const).map((key) => ({
     key,
@@ -74,6 +78,14 @@ export function AdminShell({
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-ink/90 px-4 py-3 backdrop-blur lg:hidden">
         <Logo href={`/${locale}/admin/`} size={30} />
         <div className="flex items-center gap-2">
+          <Link
+            href={`/${locale}/admin/notes/`}
+            aria-label={t.admin.sections.notes}
+            className="relative rounded-lg border border-line p-2 text-silver hover:border-gold hover:text-gold"
+          >
+            <MessageSquare size={18} />
+            {unread > 0 && <CountBadge n={unread} className="absolute -right-1.5 -top-1.5" />}
+          </Link>
           <Link
             href={`/${locale}/`}
             aria-label={t.adminUi.toWebsite}
@@ -128,6 +140,7 @@ export function AdminShell({
               >
                 <Icon size={18} />
                 {label}
+                {key === "notes" && unread > 0 && <CountBadge n={unread} className="ml-auto" />}
               </Link>
             );
           })}
@@ -156,5 +169,15 @@ export function AdminShell({
 
       <main className="min-h-screen px-4 py-6 sm:px-8 sm:py-8 lg:ml-64">{children}</main>
     </div>
+  );
+}
+
+function CountBadge({ n, className = "" }: { n: number; className?: string }) {
+  return (
+    <span
+      className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold text-ink ${className}`}
+    >
+      {n > 99 ? "99+" : n}
+    </span>
   );
 }
