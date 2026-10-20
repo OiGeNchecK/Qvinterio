@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, CalendarPlus, Check, Copy, KeyRound, Plus } from "lucide-react";
+import { Ban, CalendarPlus, Check, Copy, KeyRound, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import { basePath } from "@/lib/paths";
@@ -20,6 +20,7 @@ import {
   Select,
   Table,
   must,
+  toDateInput,
   useLoad,
 } from "../kit";
 import { loadPeople, loadProjectRefs, personName, type ProjectRef } from "../data";
@@ -34,7 +35,8 @@ type Grant = {
   created_at: string;
 };
 
-type Credentials = { name: string; key: string; site: string; until: string };
+// until is the ISO end of access; grantId lets the dialog change it.
+type Credentials = { name: string; key: string; site: string; until: string; grantId: string };
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -53,15 +55,18 @@ function clientLoginUrl() {
 }
 
 async function loadAll() {
-  const [grants, people, projects] = await Promise.all([
-    createClient()
+  const supabase = createClient();
+  const [grants, keys, people, projects] = await Promise.all([
+    supabase
       .from("client_access")
       .select("id, project_id, client_id, expires_at, revoked_at, created_at")
       .order("created_at", { ascending: false }),
+    supabase.from("client_keys").select("client_id, key"),
     loadPeople(),
     loadProjectRefs(),
   ]);
-  return { grants: must<Grant[]>(grants), people, projects };
+  const keyRows = must<{ client_id: string; key: string }[]>(keys);
+  return { grants: must<Grant[]>(grants), keys: new Map(keyRows.map((k) => [k.client_id, k.key])), people, projects };
 }
 
 export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) {
@@ -95,18 +100,22 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   const revoke = (g: Grant) =>
     run(createClient().from("client_access").update({ revoked_at: new Date().toISOString() }).eq("id", g.id));
 
+  const credentialsFor = (g: Grant): Credentials => ({
+    name: personName(people.get(g.client_id)),
+    key: data?.keys.get(g.client_id) ?? "",
+    site: projects.get(g.project_id) ?? "",
+    until: g.expires_at,
+    grantId: g.id,
+  });
+
   async function newKey(g: Grant) {
     const client = people.get(g.client_id);
     if (!window.confirm(a.newKeyConfirm.replace("{name}", personName(client)))) return;
     try {
       const res = await callAdminUsers({ action: "client_new_key", client_id: g.client_id });
       setActionError(null);
-      setCredentials({
-        name: personName(client),
-        key: res.key ?? "",
-        site: projects.get(g.project_id) ?? "",
-        until: dateFormat.format(new Date(g.expires_at)),
-      });
+      reload();
+      setCredentials({ ...credentialsFor(g), key: res.key ?? "" });
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     }
@@ -123,7 +132,7 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
       <ErrorNote error={error ?? actionError} />
 
       <Panel>
-        <Table head={[t.roles.client, a.site, t.client.validUntil, a.status, ""]}>
+        <Table head={[t.roles.client, a.site, a.accessKey, t.client.validUntil, a.status, ""]}>
           {data?.grants.map((g) => {
             const active = !g.revoked_at && new Date(g.expires_at) > new Date();
             const client = people.get(g.client_id);
@@ -131,6 +140,9 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
               <tr key={g.id}>
                 <td className="font-medium text-white">{client?.full_name || "—"}</td>
                 <td className="text-silver">{projects.get(g.project_id)}</td>
+                <td className="whitespace-nowrap font-mono tracking-wider text-gold">
+                  {data.keys.get(g.client_id) ?? "—"}
+                </td>
                 <td className="whitespace-nowrap text-silver-dim">{dateFormat.format(new Date(g.expires_at))}</td>
                 <td>
                   <Badge tone={g.revoked_at ? "red" : active ? "green" : "gray"}>
@@ -139,6 +151,9 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
                 </td>
                 <td>
                   <div className="flex justify-end gap-1.5">
+                    <IconButton onClick={() => setCredentials(credentialsFor(g))} title={a.edit}>
+                      <Pencil size={14} />
+                    </IconButton>
                     <IconButton onClick={() => newKey(g)} title={a.newKey}>
                       <KeyRound size={14} />
                     </IconButton>
@@ -155,7 +170,7 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
               </tr>
             );
           })}
-          {data && !data.grants.length && <EmptyRow cols={5}>{a.noGrants}</EmptyRow>}
+          {data && !data.grants.length && <EmptyRow cols={6}>{a.noGrants}</EmptyRow>}
         </Table>
       </Panel>
 
@@ -167,11 +182,22 @@ export function AccessSection({ locale, t }: { locale: Locale; t: Dictionary }) 
           onGranted={(c) => {
             reload();
             setGranting(false);
-            setCredentials({ ...c, until: dateFormat.format(new Date(c.until)) });
+            setCredentials(c);
           }}
         />
       )}
-      {credentials && <CredentialsModal t={t} credentials={credentials} onClose={() => setCredentials(null)} />}
+      {credentials && (
+        <CredentialsModal
+          t={t}
+          credentials={credentials}
+          formatDate={(iso) => dateFormat.format(new Date(iso))}
+          onDateSaved={(until) => {
+            setCredentials({ ...credentials, until });
+            reload();
+          }}
+          onClose={() => setCredentials(null)}
+        />
+      )}
     </div>
   );
 }
@@ -208,6 +234,7 @@ function GrantModal({
         key: res.key ?? "",
         site: projects.find((p) => p.id === form.project_id)?.name ?? "",
         until: endOfDay(form.until),
+        grantId: res.grant_id ?? "",
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -254,39 +281,64 @@ function GrantModal({
   );
 }
 
-// Shown once after a key was generated; it is not stored anywhere.
+// The key, the login link and the end of access; the date can be changed here.
 function CredentialsModal({
   t,
   credentials: c,
+  formatDate,
+  onDateSaved,
   onClose,
 }: {
   t: Dictionary;
   credentials: Credentials;
+  formatDate: (iso: string) => string;
+  onDateSaved: (until: string) => void;
   onClose: () => void;
 }) {
   const a = t.adminUi;
   const [copied, setCopied] = useState<string | null>(null);
+  const [date, setDate] = useState(toDateInput(c.until));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const url = clientLoginUrl();
   const message = a.credentialsMessage
     .replace("{site}", c.site)
     .replace("{url}", url)
     .replace("{key}", c.key)
-    .replace("{until}", c.until);
+    .replace("{until}", formatDate(c.until));
 
   async function copy(key: string, text: string) {
     await navigator.clipboard.writeText(text).catch(() => undefined);
     setCopied(key);
   }
 
+  // A new end date also lifts a revoke, like extending does.
+  async function saveDate() {
+    if (!date || !c.grantId) return;
+    setBusy(true);
+    const until = endOfDay(date);
+    const { error } = await createClient()
+      .from("client_access")
+      .update({ expires_at: until, revoked_at: null })
+      .eq("id", c.grantId);
+    setBusy(false);
+    setError(error?.message ?? null);
+    if (!error) onDateSaved(until);
+  }
+
   const row = (key: string, label: string, value: string, big?: boolean) => (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-4 py-3">
       <div className="min-w-0">
         <div className="text-xs text-silver-dim">{label}</div>
-        <div className={`truncate ${big ? "font-mono text-xl tracking-wider text-gold" : "text-silver"}`}>{value}</div>
+        <div className={`truncate ${big ? "font-mono text-xl tracking-wider text-gold" : "text-silver"}`}>
+          {value || "—"}
+        </div>
       </div>
-      <IconButton onClick={() => copy(key, value)} title={a.copy}>
-        {copied === key ? <Check size={14} /> : <Copy size={14} />}
-      </IconButton>
+      {value && (
+        <IconButton onClick={() => copy(key, value)} title={a.copy}>
+          {copied === key ? <Check size={14} /> : <Copy size={14} />}
+        </IconButton>
+      )}
     </div>
   );
 
@@ -297,8 +349,19 @@ function CredentialsModal({
         {row("url", a.loginPage, url)}
         {row("key", a.accessKey, c.key, true)}
       </div>
+      {c.grantId && (
+        <div className="mt-5 flex items-end gap-2">
+          <Field label={t.client.validUntil} className="flex-1">
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Button variant="ghost" onClick={saveDate} disabled={busy || date === toDateInput(c.until)}>
+            {a.save}
+          </Button>
+        </div>
+      )}
+      <ErrorNote error={error} />
       <ModalActions>
-        <Button variant="ghost" onClick={() => copy("all", message)}>
+        <Button variant="ghost" onClick={() => copy("all", message)} disabled={!c.key}>
           {copied === "all" ? <Check size={16} /> : <Copy size={16} />} {a.copyMessage}
         </Button>
         <Button onClick={onClose}>{a.done}</Button>

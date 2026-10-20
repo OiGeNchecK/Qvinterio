@@ -32,7 +32,7 @@ export async function callAdminUsers(body: Record<string, unknown>) {
     const detail = context ? await context.json().catch(() => null) : null;
     throw new Error(detail?.error ?? error.message);
   }
-  return data as { id?: string; key?: string };
+  return data as { id?: string; key?: string; grant_id?: string };
 }
 
 function RoleChips({ value, onToggle, t, disabled }: { value: AppRole[]; onToggle: (r: AppRole) => void; t: Dictionary; disabled?: (r: AppRole) => boolean }) {

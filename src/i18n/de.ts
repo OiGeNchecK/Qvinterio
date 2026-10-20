@@ -145,7 +145,7 @@ const de = {
     accessHint: "Der Kunde bekommt einen Zugangsschlüssel und sieht damit nur die freigegebene Baustelle.",
     newClientHint: "Ein Zugangsschlüssel wird erzeugt und an diese Baustelle gebunden. Sie sehen ihn einmal im nächsten Schritt.",
     accessFor: "Zugang für",
-    credentialsHint: "Geben Sie diesen Schlüssel an den Kunden weiter. Damit öffnet er direkt die Baustelle „{site}“. Der Schlüssel wird nur jetzt angezeigt.",
+    credentialsHint: "Geben Sie diesen Schlüssel an den Kunden weiter. Damit öffnet er direkt die Baustelle „{site}“.",
     loginPage: "Anmeldeseite",
     password: "Passwort",
     copy: "Kopieren",

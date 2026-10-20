@@ -57,6 +57,14 @@ Deno.serve(async (req) => {
     return roles.length > 0 && roles.every((r) => r === "client");
   }
 
+  // Staff can look the key up again later.
+  async function saveKey(clientId: string, key: string) {
+    const { error } = await admin
+      .from("client_keys")
+      .upsert({ client_id: clientId, key, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+  }
+
   // A new key replaces the old one; the e-mail follows the key.
   async function newClientKey(userId: string) {
     const key = generateKey();
@@ -64,6 +72,7 @@ Deno.serve(async (req) => {
     const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true, password: key });
     if (error) throw new Error(error.message);
     await admin.from("profiles").update({ email }).eq("id", userId);
+    await saveKey(userId, key);
     return { key };
   }
 
@@ -87,13 +96,16 @@ Deno.serve(async (req) => {
       const role = await admin.from("user_roles").insert({ user_id: clientId, role: "client" });
       const grant = await admin
         .from("client_access")
-        .insert({ project_id: projectId, client_id: clientId, expires_at: expiresAt, created_by: me.user.id });
-      const failed = role.error ?? grant.error;
+        .insert({ project_id: projectId, client_id: clientId, expires_at: expiresAt, created_by: me.user.id })
+        .select("id")
+        .single();
+      const saved = await admin.from("client_keys").insert({ client_id: clientId, key });
+      const failed = role.error ?? grant.error ?? saved.error;
       if (failed) {
         await admin.auth.admin.deleteUser(clientId);
         return json({ error: failed.message }, 400);
       }
-      return json({ id: clientId, key });
+      return json({ id: clientId, key, grant_id: grant.data?.id });
     }
 
     if (body.action === "client_new_key") {
