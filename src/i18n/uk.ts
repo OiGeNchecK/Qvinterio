@@ -147,6 +147,8 @@ const uk: Dictionary = {
     instagramLinkInvalid: "Посилання має починатися з https://www.instagram.com/.",
     noInstagram: "Фото ще немає – на головній показуються титульні фото з портфоліо.",
     profile: "Профіль",
+    translations: "Переклади",
+    translationsHint: "Якщо переклад порожній, на сайті буде німецький текст.",
     newOrder: "Нове замовлення",
     orderNeedsSite: "Виберіть об'єкт і додайте хоча б одну позицію або коментар.",
     pickItem: "Вибрати з каталогу …",

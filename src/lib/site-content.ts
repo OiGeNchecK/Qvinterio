@@ -115,20 +115,21 @@ export function usePortfolioItem(slug: string | null, initial: PortfolioItem | u
   });
 }
 
-type ServiceRow = { title_de: string; text_de: string | null; title_uk: string | null; text_uk: string | null; icon_url: string | null };
+// Translations are optional; empty fields fall back to German.
+type ServiceRow = Record<`title_${Locale}`, string | null> & Record<`text_${Locale}`, string | null> & { icon_url: string | null };
 
 export function useServices(locale: Locale, initial: ServiceItem[]) {
   return useRemote(initial, async () => {
     const { data, error } = await createClient()
       .from("services")
-      .select("title_de, text_de, title_uk, text_uk, icon_url")
+      .select("title_de, text_de, title_uk, text_uk, title_en, text_en, title_pl, text_pl, icon_url")
       .eq("published", true)
       .order("position")
       .overrideTypes<ServiceRow[], { merge: false }>();
     if (error) return null;
     return data.map((r) => ({
-      title: (locale === "uk" && r.title_uk) || r.title_de,
-      text: (locale === "uk" && r.text_uk) || r.text_de || "",
+      title: r[`title_${locale}`] || r.title_de || "",
+      text: r[`text_${locale}`] || r.text_de || "",
       icon: r.icon_url ?? "",
     }));
   });

@@ -145,6 +145,8 @@ const de = {
     instagramLinkInvalid: "Der Link muss mit https://www.instagram.com/ beginnen.",
     noInstagram: "Noch keine Fotos – auf der Startseite werden die Portfolio-Titelbilder gezeigt.",
     profile: "Profil",
+    translations: "Übersetzungen",
+    translationsHint: "Leere Übersetzungen zeigen auf der Website den deutschen Text.",
     newOrder: "Neue Bestellung",
     orderNeedsSite: "Bitte eine Baustelle und mindestens eine Position oder einen Kommentar angeben.",
     pickItem: "Aus dem Katalog wählen …",

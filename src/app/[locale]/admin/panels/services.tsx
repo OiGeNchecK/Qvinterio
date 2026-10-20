@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
-import type { Dictionary } from "@/i18n";
+import { LOCALES, localeLabel, type Dictionary, type Locale } from "@/i18n";
 import {
   Badge,
   EmptyRow,
@@ -25,16 +25,20 @@ import {
 import { removeUploaded } from "../upload";
 import { ImageTile, Thumb, UploadTile, moveRow, useUploads } from "./portfolio";
 
-type Service = {
+// German is required; other languages fall back to German on the website.
+const TRANSLATIONS = LOCALES.filter((l) => l !== "de");
+
+type TextFields = Record<`title_${Locale}` | `text_${Locale}`, string | null>;
+
+type Service = TextFields & {
   id: string;
   position: number;
   title_de: string;
-  text_de: string | null;
-  title_uk: string | null;
-  text_uk: string | null;
   icon_url: string | null;
   published: boolean;
 };
+
+const TEXT_COLUMNS = LOCALES.map((l) => `title_${l}, text_${l}`).join(", ");
 
 export function ServicesSection({ t }: { t: Dictionary }) {
   const a = t.adminUi;
@@ -42,9 +46,10 @@ export function ServicesSection({ t }: { t: Dictionary }) {
     must<Service[]>(
       await createClient()
         .from("services")
-        .select("id, position, title_de, text_de, title_uk, text_uk, icon_url, published")
+        .select(`id, position, ${TEXT_COLUMNS}, icon_url, published`)
         .order("position")
-        .order("created_at"),
+        .order("created_at")
+        .overrideTypes<Service[], { merge: false }>(),
     ),
   );
   const [editing, setEditing] = useState<Service | "new" | null>(null);
@@ -73,7 +78,7 @@ export function ServicesSection({ t }: { t: Dictionary }) {
       <ErrorNote error={error ?? actionError} />
 
       <Panel>
-        <Table head={[a.photo, "Deutsch", "Українська", a.visibility, ""]}>
+        <Table head={[a.photo, a.name, a.translations, a.visibility, ""]}>
           {items.map((s, i) => (
             <tr key={s.id}>
               <td>
@@ -84,8 +89,13 @@ export function ServicesSection({ t }: { t: Dictionary }) {
                 <div className="line-clamp-1 text-xs text-silver-dim">{s.text_de}</div>
               </td>
               <td>
-                <div className="text-silver">{s.title_uk}</div>
-                <div className="line-clamp-1 text-xs text-silver-dim">{s.text_uk}</div>
+                <div className="flex gap-1">
+                  {TRANSLATIONS.map((l) => (
+                    <Badge key={l} tone={s[`title_${l}`] ? "olive" : "gray"}>
+                      {localeLabel(l)}
+                    </Badge>
+                  ))}
+                </div>
               </td>
               <td>
                 <button
@@ -161,18 +171,21 @@ function ServiceModal({
   onSaved: () => void;
 }) {
   const a = t.adminUi;
-  const [form, setForm] = useState({
-    title_de: service?.title_de ?? "",
-    text_de: service?.text_de ?? "",
-    title_uk: service?.title_uk ?? "",
-    text_uk: service?.text_uk ?? "",
-    published: service?.published ?? true,
-  });
+  const [texts, setTexts] = useState(
+    () =>
+      Object.fromEntries(
+        LOCALES.flatMap((l) => [
+          [`title_${l}`, service?.[`title_${l}`] ?? ""],
+          [`text_${l}`, service?.[`text_${l}`] ?? ""],
+        ]),
+      ) as Record<keyof TextFields, string>,
+  );
+  const [published, setPublished] = useState(service?.published ?? true);
   const [icon, setIcon] = useState<string | null>(service?.icon_url ?? null);
   const uploads = useUploads("services");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
+  const set = (key: keyof TextFields) => (e: { target: { value: string } }) => setTexts({ ...texts, [key]: e.target.value });
 
   async function cancel() {
     await uploads.discard([service?.icon_url ?? null]);
@@ -180,16 +193,14 @@ function ServiceModal({
   }
 
   async function save() {
-    if (!form.title_de.trim()) return setError(a.nameRequired);
+    if (!texts.title_de.trim()) return setError(a.nameRequired);
     setBusy(true);
     setError(null);
     const row = {
-      title_de: form.title_de.trim(),
-      text_de: emptyToNull(form.text_de),
-      title_uk: emptyToNull(form.title_uk),
-      text_uk: emptyToNull(form.text_uk),
+      ...Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, emptyToNull(v)])),
+      title_de: texts.title_de.trim(),
       icon_url: icon,
-      published: form.published,
+      published,
     };
     const table = createClient().from("services");
     try {
@@ -207,19 +218,20 @@ function ServiceModal({
   return (
     <Modal title={service ? service.title_de : a.newService} onClose={cancel} wide>
       <div className="grid gap-6 sm:grid-cols-[1fr_12rem]">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={`${a.name} (DE)`}>
-            <Input value={form.title_de} onChange={set("title_de")} />
-          </Field>
-          <Field label={`${a.name} (UA)`}>
-            <Input value={form.title_uk} onChange={set("title_uk")} />
-          </Field>
-          <Field label={`${a.description} (DE)`}>
-            <Textarea value={form.text_de} onChange={set("text_de")} rows={4} />
-          </Field>
-          <Field label={`${a.description} (UA)`}>
-            <Textarea value={form.text_uk} onChange={set("text_uk")} rows={4} />
-          </Field>
+        <div>
+          <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2">
+            {LOCALES.map((l) => (
+              <div key={l} className="grid content-start gap-3">
+                <Field label={`${a.name} (${localeLabel(l)})`}>
+                  <Input value={texts[`title_${l}`]} onChange={set(`title_${l}`)} />
+                </Field>
+                <Field label={`${a.description} (${localeLabel(l)})`}>
+                  <Textarea value={texts[`text_${l}`]} onChange={set(`text_${l}`)} rows={3} />
+                </Field>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-silver-dim">{a.translationsHint}</p>
         </div>
         <div>
           <div className="mb-2 text-xs text-silver-dim">{a.photo}</div>
@@ -237,8 +249,8 @@ function ServiceModal({
       <label className="mt-6 flex items-center gap-2 text-sm text-silver">
         <input
           type="checkbox"
-          checked={form.published}
-          onChange={(e) => setForm({ ...form, published: e.target.checked })}
+          checked={published}
+          onChange={(e) => setPublished(e.target.checked)}
           className="h-4 w-4 accent-[#c4a46b]"
         />
         {a.showOnWebsite}
