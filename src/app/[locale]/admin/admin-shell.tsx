@@ -6,6 +6,8 @@ import { useState, type ReactNode } from "react";
 import {
   Building2,
   Contact,
+  Globe,
+  Hammer,
   Images,
   KeyRound,
   LayoutDashboard,
@@ -31,6 +33,7 @@ const ICONS: Record<AdminSection | "overview", LucideIcon> = {
   users: Users,
   access: KeyRound,
   portfolio: Images,
+  services: Hammer,
 };
 
 // Admin frame with a fixed sidebar, modelled on the TinTei Beauty admin.
@@ -68,13 +71,22 @@ export function AdminShell({
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-ink/90 px-4 py-3 backdrop-blur lg:hidden">
         <Logo href={`/${locale}/admin/`} size={30} />
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Menu"
-          className="rounded-lg border border-line p-2 text-silver hover:border-gold hover:text-gold"
-        >
-          <Menu size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/${locale}/`}
+            aria-label={t.adminUi.toWebsite}
+            className="rounded-lg border border-line p-2 text-silver hover:border-gold hover:text-gold"
+          >
+            <Globe size={18} />
+          </Link>
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Menu"
+            className="rounded-lg border border-line p-2 text-silver hover:border-gold hover:text-gold"
+          >
+            <Menu size={18} />
+          </button>
+        </div>
       </header>
 
       {open && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setOpen(false)} />}
@@ -118,6 +130,13 @@ export function AdminShell({
             );
           })}
         </nav>
+
+        <Link
+          href={`/${locale}/`}
+          className="flex items-center gap-3 border-t border-line px-6 py-3.5 text-sm text-silver-dim transition hover:bg-gold/10 hover:text-gold"
+        >
+          <Globe size={18} /> {t.adminUi.toWebsite}
+        </Link>
 
         <div className="border-t border-line px-6 py-4 text-sm">
           <div className="font-semibold text-silver">{user.fullName || user.email}</div>

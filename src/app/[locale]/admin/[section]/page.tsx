@@ -5,7 +5,9 @@ import { ADMIN_SECTIONS, type AdminSection } from "../sections";
 import { AccessSection } from "../panels/access";
 import { ContactsSection } from "../panels/contacts";
 import { OrdersSection } from "../panels/orders";
+import { PortfolioSection } from "../panels/portfolio";
 import { ProjectsSection } from "../panels/projects";
+import { ServicesSection } from "../panels/services";
 import { UsersSection } from "../panels/users";
 
 export const dynamicParams = false;
@@ -30,6 +32,10 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
       return <UsersSection t={t} />;
     case "access":
       return <AccessSection locale={locale} t={t} />;
+    case "portfolio":
+      return <PortfolioSection locale={locale} t={t} />;
+    case "services":
+      return <ServicesSection t={t} />;
     default:
       return (
         <div>

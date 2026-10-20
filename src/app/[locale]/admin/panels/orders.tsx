@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/lib/auth";
@@ -35,6 +35,7 @@ import {
   type OrderStatus,
   type Person,
 } from "../data";
+import { CatalogModal, NewOrderModal } from "./new-order";
 
 export type Order = {
   id: string;
@@ -87,6 +88,7 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [statusFilter, setStatusFilter] = useState<"" | "open" | OrderStatus>(linkedProject ? "" : "open");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<"new" | "catalog" | null>(null);
   const a = t.adminUi;
 
   const orders = (data?.orders ?? []).filter(
@@ -121,6 +123,12 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
             </option>
           ))}
         </Select>
+        <Button variant="ghost" onClick={() => setDialog("catalog")}>
+          <BookOpen size={16} /> {a.catalog}
+        </Button>
+        <Button onClick={() => setDialog("new")}>
+          <Plus size={16} /> {a.newOrder}
+        </Button>
       </SectionHeader>
       <ErrorNote error={error} />
 
@@ -135,6 +143,11 @@ export function OrdersSection({ locale, t }: { locale: Locale; t: Dictionary }) 
           loaded={!!data}
         />
       </Panel>
+
+      {dialog === "new" && data && (
+        <NewOrderModal t={t} projects={data.projects} onClose={() => setDialog(null)} onSaved={reload} />
+      )}
+      {dialog === "catalog" && <CatalogModal t={t} onClose={() => setDialog(null)} />}
 
       {opened && data && (
         <OrderModal

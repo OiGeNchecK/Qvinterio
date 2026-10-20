@@ -1,21 +1,11 @@
-import Image from "next/image";
-import Link from "next/link";
 import { ButtonLink } from "@/components/button";
 import { SecretEmblem } from "@/components/secret-emblem";
 import { SiteBackground } from "@/components/site-background";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
-import { projects } from "@/content/projects";
-import { asset } from "@/lib/paths";
-
-// Line symbols in public/leistungen/, in the same order as t.home.services.
-const serviceImages = [
-  "01-glassystemwaende", "02-bestandsglaswaende", "03-individuelle-moebel", "04-teekuechen",
-  "05-brandschutzsanierung", "06-tueren", "07-kaelte-lueftung", "08-abbruch-rueckbau",
-  "09-trockenbau", "10-maler-lackierarbeiten", "11-deckensysteme", "12-fliesenarbeiten",
-  "13-baureinigung", "14-elektro-kommunikation", "15-heizung-sanitaer", "16-bodenbelaege",
-];
+import { PortfolioGrid } from "@/components/portfolio-grid";
+import { ServicesGrid } from "@/components/services-grid";
 
 export default async function Home({ params }: PageProps<"/[locale]">) {
   const { locale, t } = getDictionary((await params).locale);
@@ -59,52 +49,12 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
       <section id="works" className="relative z-10 mx-auto max-w-7xl px-4 py-16">
         <h2 className="font-display text-3xl text-white">{t.home.worksTitle}</h2>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <Link
-              key={p.slug}
-              href={`/${locale}/projekte/${p.slug}/`}
-              className="group overflow-hidden rounded-2xl border border-line bg-panel transition hover:border-olive"
-            >
-              <div className="relative aspect-[4/3] bg-panel-2">
-                <Image
-                  src={p.cover}
-                  alt={`${p.city}, ${p.title}`}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                  className="object-cover text-transparent transition duration-500 group-hover:scale-105"
-                />
-              </div>
-              <div className="flex items-baseline justify-between gap-3 p-5">
-                <div>
-                  <h3 className="font-medium text-white">{p.title}</h3>
-                  <p className="text-xs text-silver-dim">{p.city}</p>
-                </div>
-                <span className="text-xs text-olive">{p.area}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <PortfolioGrid locale={locale} />
       </section>
 
       <section id="services" className="relative z-10 mx-auto max-w-7xl px-4 py-16">
         <h2 className="font-display text-3xl text-white">{t.home.servicesTitle}</h2>
-        <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
-          {t.home.services.map((s, i) => (
-            <div key={s.title} className="bg-panel p-5">
-              <Image
-                src={asset(`/leistungen/${serviceImages[i]}.webp`)}
-                alt=""
-                width={320}
-                height={240}
-                sizes="(min-width: 1024px) 280px, (min-width: 640px) 50vw, 100vw"
-                className="mb-4 aspect-[4/3] w-full rounded-xl object-cover"
-              />
-              <h3 className="font-medium text-white">{s.title}</h3>
-              <p className="mt-1.5 text-sm text-silver-dim">{s.text}</p>
-            </div>
-          ))}
-        </div>
+        <ServicesGrid locale={locale} t={t} />
       </section>
 
       <section className="relative z-10 mx-auto max-w-7xl px-4 py-16">

@@ -5,6 +5,7 @@ export const ADMIN_SECTIONS = [
   "users",
   "access",
   "portfolio",
+  "services",
 ] as const;
 
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
