@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { getDictionary } from "@/i18n";
 import { PortfolioGrid } from "@/components/portfolio-grid";
 import { ServicesGrid } from "@/components/services-grid";
+import { ContactForm } from "@/components/contact-form";
 
 export default async function Home({ params }: PageProps<"/[locale]">) {
   const { locale, t } = getDictionary((await params).locale);
@@ -62,6 +63,17 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
           <h2 className="font-display text-3xl text-white">{t.home.clientTitle}</h2>
           <p className="mt-4 max-w-2xl text-silver-dim">{t.home.clientText}</p>
           <ButtonLink href={`/${locale}/login/?for=client`} className="mt-8">{t.nav.clientLogin}</ButtonLink>
+        </div>
+      </section>
+
+      <section id="contact" className="relative z-10 mx-auto max-w-7xl scroll-mt-6 px-4 pb-20 pt-4">
+        <div className="grid gap-10 rounded-3xl border border-line bg-panel/80 p-6 sm:p-12 lg:grid-cols-[2fr_3fr]">
+          <div>
+            <p className="mb-4 text-xs uppercase tracking-[0.3em] text-olive">{t.nav.contact}</p>
+            <h2 className="font-display text-3xl text-white">{t.contactForm.title}</h2>
+            <p className="mt-4 text-silver-dim">{t.contactForm.text}</p>
+          </div>
+          <ContactForm locale={locale} t={t} />
         </div>
       </section>
 

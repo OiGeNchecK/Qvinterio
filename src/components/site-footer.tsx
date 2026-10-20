@@ -4,7 +4,7 @@ import { company } from "@/content/company";
 
 export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
   return (
-    <footer id="contact" className="relative z-10 border-t border-line">
+    <footer className="relative z-10 border-t border-line">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-3">
         <div>
           <h2 className="font-display text-2xl text-white">{t.home.contactTitle}</h2>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, HardHat, KeyRound, MessageSquare, ShoppingCart, Truck, X } from "lucide-react";
+import { Building2, HardHat, Inbox, KeyRound, MessageSquare, ShoppingCart, Truck, X } from "lucide-react";
 import { ProgressBar } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import type { Dictionary, Locale } from "@/i18n";
@@ -16,7 +16,7 @@ type View = "new" | "open" | "projects" | null;
 
 async function loadAll() {
   const supabase = createClient();
-  const [orders, projects, people, access, contacts, notes] = await Promise.all([
+  const [orders, projects, people, access, contacts, notes, requests] = await Promise.all([
     supabase
       .from("orders")
       .select(ORDER_SELECT)
@@ -32,6 +32,7 @@ async function loadAll() {
       .gt("expires_at", new Date().toISOString()),
     supabase.from("contacts").select("id, company, person").order("company"),
     supabase.from("client_notes").select("id", { count: "exact", head: true }).eq("status", "open"),
+    supabase.from("contact_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
   ]);
   return {
     openOrders: must<Order[]>(orders),
@@ -40,6 +41,7 @@ async function loadAll() {
     activeAccess: access.count ?? 0,
     contacts: must<ContactRef[]>(contacts),
     openNotes: notes.count ?? 0,
+    newRequests: requests.count ?? 0,
   };
 }
 
@@ -78,7 +80,7 @@ export function AdminOverview({ locale, t }: { locale: Locale; t: Dictionary }) 
       <SectionHeader title={t.admin.sections.overview} />
       <ErrorNote error={error} />
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
         <StatCard
           icon={<ShoppingCart size={24} />}
           value={data ? newOrders.length : "–"}
@@ -105,6 +107,12 @@ export function AdminOverview({ locale, t }: { locale: Locale; t: Dictionary }) 
           value={data?.openNotes ?? "–"}
           label={t.notes.openCount}
           onClick={() => router.push(`/${locale}/admin/notes/`)}
+        />
+        <StatCard
+          icon={<Inbox size={24} />}
+          value={data?.newRequests ?? "–"}
+          label={t.requests.newCount}
+          onClick={() => router.push(`/${locale}/admin/requests/`)}
         />
         <StatCard icon={<HardHat size={24} />} value={data ? team.length : "–"} label={a.teamCount} />
         <StatCard icon={<KeyRound size={24} />} value={data?.activeAccess ?? "–"} label={a.activeAccess} />

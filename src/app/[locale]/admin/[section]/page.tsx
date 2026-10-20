@@ -8,6 +8,7 @@ import { NotesSection } from "../panels/notes";
 import { OrdersSection } from "../panels/orders";
 import { PortfolioSection } from "../panels/portfolio";
 import { ProjectsSection } from "../panels/projects";
+import { RequestsSection } from "../panels/requests";
 import { ServicesSection } from "../panels/services";
 import { UsersSection } from "../panels/users";
 import { WorkerAccessSection } from "../panels/worker-access";
@@ -28,6 +29,8 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
       return <OrdersSection locale={locale} t={t} />;
     case "notes":
       return <NotesSection locale={locale} t={t} />;
+    case "requests":
+      return <RequestsSection locale={locale} t={t} />;
     case "projects":
       return <ProjectsSection locale={locale} t={t} />;
     case "contacts":

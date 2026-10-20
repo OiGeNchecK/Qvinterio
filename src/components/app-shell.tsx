@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { Globe } from "lucide-react";
 import { Logo } from "./logo";
 import { LocaleSwitcher } from "./locale-switcher";
 import { createClient } from "@/lib/supabase/client";
@@ -42,6 +43,14 @@ export function AppShell({
             <span className="hidden text-sm text-silver-dim sm:inline">/ {title}</span>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href={`/${locale}/`}
+              aria-label={t.adminUi.toWebsite}
+              className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs hover:border-olive"
+            >
+              <Globe size={14} />
+              <span className="hidden sm:inline">{t.adminUi.toWebsite}</span>
+            </Link>
             <LocaleSwitcher />
             <div className="hidden text-right text-xs leading-tight md:block">
               <div className="text-silver">{user.fullName || user.email}</div>

@@ -10,6 +10,7 @@ import {
   Hammer,
   HardHat,
   Images,
+  Inbox,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -25,6 +26,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/lib/auth";
 import { useUnreadCount } from "@/components/site-notes";
+import { useNewRequestCount } from "./panels/requests";
 import type { Dictionary, Locale } from "@/i18n";
 import type { AdminSection } from "./sections";
 
@@ -32,6 +34,7 @@ const ICONS: Record<AdminSection | "overview", LucideIcon> = {
   overview: LayoutDashboard,
   orders: ShoppingCart,
   notes: MessageSquare,
+  requests: Inbox,
   projects: Building2,
   contacts: Contact,
   users: Users,
@@ -58,6 +61,7 @@ export function AdminShell({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const unread = useUnreadCount();
+  const newRequests = useNewRequestCount();
 
   const items = (["overview", ...sections] as const).map((key) => ({
     key,
@@ -85,6 +89,14 @@ export function AdminShell({
           >
             <MessageSquare size={18} />
             {unread > 0 && <CountBadge n={unread} className="absolute -right-1.5 -top-1.5" />}
+          </Link>
+          <Link
+            href={`/${locale}/admin/requests/`}
+            aria-label={t.admin.sections.requests}
+            className="relative rounded-lg border border-line p-2 text-silver hover:border-gold hover:text-gold"
+          >
+            <Inbox size={18} />
+            {newRequests > 0 && <CountBadge n={newRequests} className="absolute -right-1.5 -top-1.5" />}
           </Link>
           <Link
             href={`/${locale}/`}
@@ -141,6 +153,7 @@ export function AdminShell({
                 <Icon size={18} />
                 {label}
                 {key === "notes" && unread > 0 && <CountBadge n={unread} className="ml-auto" />}
+                {key === "requests" && newRequests > 0 && <CountBadge n={newRequests} className="ml-auto" />}
               </Link>
             );
           })}

@@ -1,6 +1,7 @@
 export const ADMIN_SECTIONS = [
   "orders",
   "notes",
+  "requests",
   "projects",
   "contacts",
   "users",
