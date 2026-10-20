@@ -7,6 +7,7 @@ import { ContactsSection } from "../panels/contacts";
 import { InstagramSection } from "../panels/instagram";
 import { NotesSection } from "../panels/notes";
 import { OrdersSection } from "../panels/orders";
+import { PhotosSection } from "../panels/photos";
 import { PortfolioSection } from "../panels/portfolio";
 import { ProjectsSection } from "../panels/projects";
 import { RequestsSection } from "../panels/requests";
@@ -34,6 +35,8 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
       return <RequestsSection locale={locale} t={t} />;
     case "projects":
       return <ProjectsSection locale={locale} t={t} />;
+    case "photos":
+      return <PhotosSection locale={locale} t={t} />;
     case "contacts":
       return <ContactsSection t={t} />;
     case "users":

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CalendarDays, History, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, History, ImageIcon, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { ProgressBar } from "@/components/ui";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
@@ -127,6 +127,13 @@ export function ProjectsSection({ locale, t }: { locale: Locale; t: Dictionary }
                     className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-silver transition hover:border-gold hover:text-gold"
                   >
                     <History size={14} />
+                  </Link>
+                  <Link
+                    href={`/${locale}/admin/photos/?project=${p.id}`}
+                    title={t.sitePhotos.open}
+                    className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-silver transition hover:border-gold hover:text-gold"
+                  >
+                    <ImageIcon size={14} />
                   </Link>
                   <IconButton onClick={() => setTasksOf(p)} title={t.tasks.manage}>
                     <ListChecks size={14} />
