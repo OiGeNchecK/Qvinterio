@@ -134,6 +134,7 @@ const uk: Dictionary = {
     pickItem: "Вибрати з каталогу …",
     customItem: "Написати самому",
     customItemHint: "Що потрібно?",
+    pickContainer: "Виберіть тип контейнера …",
     addLine: "Додати позицію",
     unit: "Одиниця",
     catalog: "Каталог",

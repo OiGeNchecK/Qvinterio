@@ -5,8 +5,9 @@ import { X } from "lucide-react";
 
 // Small form and list helpers shared by the admin sections only.
 
+// 16px text on phones so iOS does not zoom into a focused field.
 const control =
-  "rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm text-silver outline-none transition focus:border-olive";
+  "rounded-xl border border-line bg-panel-2 px-3 py-2.5 text-base text-silver outline-none transition focus:border-olive sm:py-2 sm:text-sm";
 
 // Full width unless the caller sets its own width.
 function controlClass(extra = "") {
@@ -129,9 +130,10 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    // A sheet from the bottom on phones, a centred dialog on larger screens.
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className={`max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-line bg-panel p-6 sm:p-8 ${wide ? "max-w-3xl" : "max-w-lg"}`}
+        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-line bg-panel p-5 pb-8 sm:max-h-[88vh] sm:rounded-2xl sm:p-8 ${wide ? "max-w-3xl" : "max-w-lg"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">

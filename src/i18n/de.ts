@@ -132,6 +132,7 @@ const de = {
     pickItem: "Aus dem Katalog wählen …",
     customItem: "Eigene Eingabe",
     customItemHint: "Was wird benötigt?",
+    pickContainer: "Containerart wählen …",
     addLine: "Position hinzufügen",
     unit: "Einheit",
     catalog: "Katalog",

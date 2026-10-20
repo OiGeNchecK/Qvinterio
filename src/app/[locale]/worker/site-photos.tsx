@@ -155,7 +155,7 @@ export function SitePhotos({ site, locale, t }: { site: WorkerSite; locale: Loca
         </label>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label
-            className={`inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-b from-olive-light to-olive px-5 py-2.5 text-sm font-medium text-ink transition hover:brightness-110 ${
+            className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full sm:w-auto bg-gradient-to-b from-olive-light to-olive px-5 py-3 text-sm sm:py-2.5 font-medium text-ink transition hover:brightness-110 ${
               progress ? "pointer-events-none opacity-50" : ""
             }`}
           >
@@ -210,8 +210,8 @@ export function SitePhotos({ site, locale, t }: { site: WorkerSite; locale: Loca
                   </Badge>
                 )}
                 {canEdit(p) && (
-                  <IconButton danger onClick={() => remove(p)} title={a.delete}>
-                    <Trash2 size={13} />
+                  <IconButton danger className="p-2!" onClick={() => remove(p)} title={a.delete}>
+                    <Trash2 size={14} />
                   </IconButton>
                 )}
               </div>

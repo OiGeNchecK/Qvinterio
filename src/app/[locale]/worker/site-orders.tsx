@@ -72,16 +72,15 @@ export function SiteOrders({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          onClick={() => {
-            setSent(false);
-            setOrdering(true);
-          }}
-        >
-          <Plus size={16} /> {t.adminUi.newOrder}
-        </Button>
-      </div>
+      <Button
+        className="w-full py-3 sm:w-auto sm:py-2.5"
+        onClick={() => {
+          setSent(false);
+          setOrdering(true);
+        }}
+      >
+        <Plus size={16} /> {t.adminUi.newOrder}
+      </Button>
       {sent && (
         <p className="rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-300">
           {w.orderSent}
@@ -177,15 +176,15 @@ export function OrderCard({
             {w.deliveryOn} {date.format(new Date(o.delivery_date))}
           </span>
         )}
-        <span className="ml-auto flex gap-3">
+        <span className="ml-auto flex gap-2">
           <button
             onClick={() => setShowHistory(!showHistory)}
-            className="inline-flex items-center gap-1 text-silver-dim hover:text-gold"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-silver-dim hover:text-gold"
           >
             <History size={13} /> {w.history}
           </button>
           {mine && o.status === "new" && (
-            <button onClick={cancel} className="text-red-400 hover:underline">
+            <button onClick={cancel} className="rounded-md px-2 py-1.5 text-red-400 hover:underline">
               {w.cancelOrder}
             </button>
           )}

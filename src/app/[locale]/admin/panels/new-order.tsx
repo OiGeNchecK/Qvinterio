@@ -29,6 +29,16 @@ type CatalogItem = { id: string; category: OrderCategory; name: string; unit: st
 const CUSTOM = "__custom";
 const UNITS = ["Stk", "m", "m²", "m³", "kg", "t", "Paket", "Rolle", "Sack", "Palette"];
 
+// Containers a worker can ask for, with the unit picked by default; the
+// amount is either a size in m³ or a number of pieces.
+const CONTAINER_TYPES = [
+  { name: "Container Baumischabfall", unit: "m³" },
+  { name: "Container Bauschutt", unit: "m³" },
+  { name: "Container Glas", unit: "m³" },
+  { name: "KMF-Säcke (Mineralwolle)", unit: "Stk" },
+];
+const CONTAINER_UNITS = ["m³", "Stk"];
+
 // The API returns at most 1000 rows per request, so the catalog is read in pages.
 async function loadCatalog() {
   const supabase = createClient();
@@ -87,7 +97,21 @@ export function NewOrderModal({
 
   const options = (catalog.data ?? []).filter((c) => c.active && c.category === form.category);
   const byId = new Map(catalog.data?.map((c) => [c.id, c]));
+  const containers = form.category === "container";
   const setLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+
+  function setCategory(category: OrderCategory) {
+    setForm({ ...form, category });
+    // Free text lines switch between typed items and the container list.
+    const listChanged = freeText && (category === "container") !== (form.category === "container");
+    setLines(
+      lines.map((l) => ({
+        ...l,
+        pick: l.pick === CUSTOM ? CUSTOM : "",
+        ...(listChanged ? { text: "", unit: category === "container" ? "m³" : "Stk" } : {}),
+      })),
+    );
+  }
 
   async function save() {
     const items = lines
@@ -132,7 +156,11 @@ export function NewOrderModal({
     <Modal title={a.newOrder} onClose={onClose} wide>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={a.site}>
-          <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+          <Select
+            value={form.project_id}
+            disabled={!!projectId}
+            onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+          >
             <option value="">—</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -141,21 +169,36 @@ export function NewOrderModal({
             ))}
           </Select>
         </Field>
-        <Field label={a.category}>
-          <Select
-            value={form.category}
-            onChange={(e) => {
-              setForm({ ...form, category: e.target.value as OrderCategory });
-              setLines(lines.map((l) => ({ ...l, pick: l.pick === CUSTOM ? CUSTOM : "" })));
-            }}
-          >
-            {ORDER_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {t.orderCategory[c]}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {freeText ? (
+          // Big buttons instead of a dropdown: workers order from their phones.
+          <div className="space-y-1.5 sm:col-span-2">
+            <span className="text-xs text-silver-dim">{a.category}</span>
+            <div className="flex flex-wrap gap-2">
+              {ORDER_CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  className={`rounded-full border px-4 py-2 text-sm transition ${
+                    form.category === c ? "border-gold bg-gold/15 text-gold" : "border-line text-silver hover:border-gold/60"
+                  }`}
+                >
+                  {t.orderCategory[c]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <Field label={a.category}>
+            <Select value={form.category} onChange={(e) => setCategory(e.target.value as OrderCategory)}>
+              {ORDER_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {t.orderCategory[c]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         {contacts && (
           <Field label={a.supplier}>
             <Select value={form.contact_id} onChange={(e) => setForm({ ...form, contact_id: e.target.value })}>
@@ -190,7 +233,24 @@ export function NewOrderModal({
                     <option value={CUSTOM}>✎ {a.customItem}</option>
                   </Select>
                 )}
-                {l.pick === CUSTOM && (
+                {freeText && containers ? (
+                  <Select
+                    value={l.text}
+                    onChange={(e) =>
+                      setLine(i, {
+                        text: e.target.value,
+                        unit: CONTAINER_TYPES.find((c) => c.name === e.target.value)?.unit ?? l.unit,
+                      })
+                    }
+                  >
+                    <option value="">{a.pickContainer}</option>
+                    {CONTAINER_TYPES.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                ) : l.pick === CUSTOM && (
                   <Input
                     autoFocus={!freeText || i > 0}
                     value={l.text}
@@ -204,7 +264,7 @@ export function NewOrderModal({
                 <Input value={byId.get(l.pick)?.unit ?? ""} disabled />
               ) : (
                 <Select value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })}>
-                  {UNITS.map((u) => (
+                  {(freeText && containers ? CONTAINER_UNITS : UNITS).map((u) => (
                     <option key={u} value={u}>
                       {u}
                     </option>
