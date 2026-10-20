@@ -76,19 +76,3 @@ const STAGE_TONES: Record<StageStatus, Tone> = { pending: "gray", in_progress: "
 export const orderStatusTone = (s: OrderStatus) => ORDER_TONES[s];
 export const projectStatusTone = (s: ProjectStatus) => PROJECT_TONES[s];
 export const stageStatusTone = (s: StageStatus) => STAGE_TONES[s];
-
-// Big German dealers behind each catalog "channel", shown as a hint in the catalog.
-export const CHANNEL_DEALERS: Record<string, string> = {
-  Baustoffhandel: "Raab Karcher (STARK), Hagebau, Bauking, Mobau, BayWa Baustoffe, Eurobaustoff-Händler",
-  Malergroßhandel: "MEGA, Brillux-Niederlassungen, Sto VerkaufsCenter, Caparol-Fachhandel",
-  "Boden-/Fliesenhandel": "MEGA, Raab Karcher Fliesen, Kemmler, Bodenbelags-Fachgroßhandel",
-  Elektrogroßhandel: "Sonepar, Rexel, FEGA & Schmitt, Alexander Bürkle",
-  "SHK-Großhandel": "GC-Gruppe (Cordes & Graefe), Richter+Frenzel, Gienger",
-  Holzhandel: "Holzland-Händler, Hagebau, BayWa",
-  "Werkzeug-/Befestigungshandel": "Würth, Berner, Hilti Store, Hahn+Kolb",
-  Baumarkt: "OBI, Hornbach, Bauhaus, toom, hagebaumarkt, Globus Baumarkt",
-  "Hersteller direkt": "Bestellung beim Hersteller bzw. dessen Niederlassung",
-  Containerdienst: "Remondis, ALBA, PreZero, Veolia, regionale Containerdienste",
-  Mietpark: "Boels, Zeppelin Rental, Loxam, HKL, Mateco, Gerken",
-  Dienstleister: "Regionale Dienstleister",
-};
