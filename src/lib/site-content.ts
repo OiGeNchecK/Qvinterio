@@ -133,3 +133,21 @@ export function useServices(locale: Locale, initial: ServiceItem[]) {
     }));
   });
 }
+
+export type InstagramPost = { image: string; href: string };
+
+// Homepage Instagram block. Without picked photos it falls back to the
+// portfolio covers, all linking to the profile.
+export function useInstagramPosts(profileUrl: string) {
+  return useRemote<InstagramPost[] | null>(null, async () => {
+    const { data, error } = await createClient()
+      .from("instagram_posts")
+      .select("image_url, post_url")
+      .eq("published", true)
+      .order("position")
+      .limit(6)
+      .overrideTypes<{ image_url: string; post_url: string | null }[], { merge: false }>();
+    if (error || !data.length) return null;
+    return data.map((r) => ({ image: r.image_url, href: r.post_url || profileUrl }));
+  });
+}

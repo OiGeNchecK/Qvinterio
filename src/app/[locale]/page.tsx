@@ -7,6 +7,7 @@ import { getDictionary } from "@/i18n";
 import { PortfolioGrid } from "@/components/portfolio-grid";
 import { ServicesGrid } from "@/components/services-grid";
 import { ContactForm } from "@/components/contact-form";
+import { InstagramBlock } from "@/components/instagram-block";
 
 export default async function Home({ params }: PageProps<"/[locale]">) {
   const { locale, t } = getDictionary((await params).locale);
@@ -56,6 +57,10 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
       <section id="services" className="relative z-10 mx-auto max-w-7xl px-4 py-16">
         <h2 className="font-display text-3xl text-white">{t.home.servicesTitle}</h2>
         <ServicesGrid locale={locale} t={t} />
+      </section>
+
+      <section id="instagram" className="relative z-10 mx-auto max-w-7xl px-4 py-16">
+        <InstagramBlock t={t} />
       </section>
 
       <section className="relative z-10 mx-auto max-w-7xl px-4 py-16">

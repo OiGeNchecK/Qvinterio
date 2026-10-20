@@ -9,6 +9,7 @@ export const ADMIN_SECTIONS = [
   "workers",
   "portfolio",
   "services",
+  "instagram",
 ] as const;
 
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];

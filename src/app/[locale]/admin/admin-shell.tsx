@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   Building2,
+  Camera,
   Contact,
   Globe,
   Hammer,
@@ -42,6 +43,7 @@ const ICONS: Record<AdminSection | "overview", LucideIcon> = {
   workers: HardHat,
   portfolio: Images,
   services: Hammer,
+  instagram: Camera,
 };
 
 // Admin frame with a fixed sidebar, modelled on the TinTei Beauty admin.

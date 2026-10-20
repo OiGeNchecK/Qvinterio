@@ -4,6 +4,7 @@ import { Panel, SectionHeader } from "../kit";
 import { ADMIN_SECTIONS, type AdminSection } from "../sections";
 import { AccessSection } from "../panels/access";
 import { ContactsSection } from "../panels/contacts";
+import { InstagramSection } from "../panels/instagram";
 import { NotesSection } from "../panels/notes";
 import { OrdersSection } from "../panels/orders";
 import { PortfolioSection } from "../panels/portfolio";
@@ -45,6 +46,8 @@ export default async function AdminSectionPage({ params }: PageProps<"/[locale]/
       return <PortfolioSection locale={locale} t={t} />;
     case "services":
       return <ServicesSection t={t} />;
+    case "instagram":
+      return <InstagramSection t={t} />;
     default:
       return (
         <div>
