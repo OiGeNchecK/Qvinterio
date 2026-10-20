@@ -415,6 +415,12 @@ const de = {
     workerHint: "Setzen Sie den Status, sobald sich etwas ändert. Bei Fragen oder Problemen schreiben Sie einen Kommentar.",
     overdue: "Überfällig",
     you: "Sie",
+    attach: "Anhängen",
+    attachHint: "Fotos, Videos oder Dateien, max. 50 MB pro Datei.",
+    tooLarge: "„{name}“ ist größer als 50 MB. Bitte ein kürzeres Video aufnehmen oder die Datei verkleinern.",
+    files: "Anhänge",
+    uploading: "Wird hochgeladen … {done} von {total}",
+    confirmDeleteFile: "Diese Datei löschen?",
     status: { open: "Offen", in_progress: "In Arbeit", blocked: "Behindert", done: "Erledigt" },
   },
   stageStatus: {

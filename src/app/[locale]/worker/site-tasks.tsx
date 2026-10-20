@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Dictionary, Locale } from "@/i18n";
 import { Badge, ErrorNote, toneClass, useLoad } from "../admin/kit";
 import { TASK_STATUSES, taskStatusTone, type TaskStatus } from "../admin/data";
-import { TaskDates, TaskThread, commentCount, loadTasks, type SiteTask } from "../admin/panels/tasks";
+import { TaskAttachments, TaskDates, TaskThread, commentCount, loadTasks, type SiteTask } from "../admin/panels/tasks";
 import type { WorkerSite } from "./worker-home";
 
 // The site's tasks from the Bauleitung; the team sets the status and comments.
@@ -26,7 +26,7 @@ export function SiteTasks({ site, locale, t }: { site: WorkerSite; locale: Local
       )}
       <ul className="space-y-3">
         {[...open, ...(showDone ? done : [])].map((task) => (
-          <TaskCard key={task.id} task={task} locale={locale} t={t} onChanged={reload} />
+          <TaskCard key={task.id} projectId={site.id} task={task} locale={locale} t={t} onChanged={reload} />
         ))}
       </ul>
       {done.length > 0 && (
@@ -41,7 +41,19 @@ export function SiteTasks({ site, locale, t }: { site: WorkerSite; locale: Local
   );
 }
 
-function TaskCard({ task, locale, t, onChanged }: { task: SiteTask; locale: Locale; t: Dictionary; onChanged: () => void }) {
+function TaskCard({
+  projectId,
+  task,
+  locale,
+  t,
+  onChanged,
+}: {
+  projectId: string;
+  task: SiteTask;
+  locale: Locale;
+  t: Dictionary;
+  onChanged: () => void;
+}) {
   const k = t.tasks;
   const [status, setStatus] = useState(task.status);
   const [showThread, setShowThread] = useState(false);
@@ -67,6 +79,7 @@ function TaskCard({ task, locale, t, onChanged }: { task: SiteTask; locale: Loca
         <Badge tone={taskStatusTone(status)}>{k.status[status]}</Badge>
       </div>
       {task.description && <p className="mt-2 whitespace-pre-line text-sm text-silver-dim">{task.description}</p>}
+      <TaskAttachments task={task} />
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {TASK_STATUSES.map((s) => (
@@ -91,7 +104,7 @@ function TaskCard({ task, locale, t, onChanged }: { task: SiteTask; locale: Loca
       >
         <MessageSquare size={15} /> {k.commentCount.replace("{n}", String(commentCount(task)))}
       </button>
-      {showThread && <TaskThread taskId={task.id} locale={locale} t={t} onChanged={onChanged} />}
+      {showThread && <TaskThread projectId={projectId} taskId={task.id} locale={locale} t={t} onChanged={onChanged} />}
     </li>
   );
 }

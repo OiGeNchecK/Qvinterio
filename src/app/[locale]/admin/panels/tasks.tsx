@@ -22,6 +22,18 @@ import {
   useLoad,
 } from "../kit";
 import { TASK_STATUSES, formatDateRange, personName, taskStatusTone, type TaskStatus } from "../data";
+import {
+  FileGallery,
+  FilePicker,
+  PickedFiles,
+  loadTaskFiles,
+  removeTaskFile,
+  removeTaskFiles,
+  taskFilePaths,
+  tooLarge,
+  uploadTaskFiles,
+  type TaskFile,
+} from "./task-files";
 
 export type SiteTask = {
   id: string;
@@ -32,6 +44,7 @@ export type SiteTask = {
   end_date: string | null;
   created_at: string;
   site_task_comments: { status: TaskStatus | null }[];
+  site_task_files: { comment_id: number | null }[];
 };
 
 type TaskComment = {
@@ -48,7 +61,7 @@ export async function loadTasks(projectId: string) {
   const tasks = must<SiteTask[]>(
     await createClient()
       .from("site_tasks")
-      .select("id, title, description, status, start_date, end_date, created_at, site_task_comments(status)")
+      .select("id, title, description, status, start_date, end_date, created_at, site_task_comments(status), site_task_files(comment_id)")
       .eq("project_id", projectId),
   );
   const key = (t: SiteTask) => `${t.status === "done" ? 1 : 0}|${t.start_date ?? t.end_date ?? "9999"}|${t.created_at}`;
@@ -56,6 +69,7 @@ export async function loadTasks(projectId: string) {
 }
 
 export const commentCount = (task: SiteTask) => task.site_task_comments.filter((c) => !c.status).length;
+const taskFileCount = (task: SiteTask) => task.site_task_files.filter((f) => f.comment_id === null).length;
 
 export function isOverdue(task: SiteTask) {
   return task.status !== "done" && !!task.end_date && task.end_date < new Date().toISOString().slice(0, 10);
@@ -85,6 +99,15 @@ export function TasksModal({
     const { error } = await action;
     setActionError(error?.message ?? null);
     reload();
+  }
+
+  async function deleteTask(id: string) {
+    try {
+      await removeTaskFiles(await taskFilePaths("task_id", id));
+    } catch (e) {
+      return setActionError(e instanceof Error ? e.message : String(e));
+    }
+    run(tasks().delete().eq("id", id));
   }
 
   const open = data?.filter((x) => x.status !== "done") ?? [];
@@ -147,20 +170,23 @@ export function TasksModal({
                   <IconButton
                     danger
                     title={t.adminUi.delete}
-                    onClick={() => window.confirm(k.confirmDelete) && run(tasks().delete().eq("id", task.id))}
+                    onClick={() => window.confirm(k.confirmDelete) && deleteTask(task.id)}
                   >
                     <Trash2 size={14} />
                   </IconButton>
                 </div>
               </div>
               {task.description && <p className="mt-2 whitespace-pre-line text-sm text-silver-dim">{task.description}</p>}
+              <TaskAttachments task={task} />
               <button
                 onClick={() => setThread(thread === task.id ? null : task.id)}
                 className="mt-2 inline-flex items-center gap-1.5 py-1 text-xs text-silver-dim hover:text-gold"
               >
                 <MessageSquare size={13} /> {k.commentCount.replace("{n}", String(commentCount(task)))}
               </button>
-              {thread === task.id && <TaskThread taskId={task.id} locale={locale} t={t} onChanged={reload} />}
+              {thread === task.id && (
+                <TaskThread projectId={project.id} taskId={task.id} locale={locale} t={t} onChanged={reload} />
+              )}
             </li>
           ),
         )}
@@ -195,12 +221,27 @@ function TaskForm({
     start_date: toDateInput(task?.start_date ?? null),
     end_date: toDateInput(task?.end_date ?? null),
   });
+  const [files, setFiles] = useState<File[]>([]);
+  const existing = useLoad(() => (task ? loadTaskFiles(task.id, true) : Promise.resolve([] as TaskFile[])));
+  const [progress, setProgress] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function removeExisting(file: TaskFile) {
+    if (!window.confirm(k.confirmDeleteFile)) return;
+    try {
+      await removeTaskFile(file);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+    existing.reload();
+  }
 
   async function save() {
     if (!form.title.trim()) return setError(k.titleRequired);
     if (form.start_date && form.end_date && form.end_date < form.start_date) return setError(k.endBeforeStart);
+    const big = tooLarge(files, t);
+    if (big) return setError(big);
     setBusy(true);
     setError(null);
     const row = {
@@ -211,12 +252,22 @@ function TaskForm({
       end_date: form.end_date || null,
     };
     const supabase = createClient();
-    const { error } = task
-      ? await supabase.from("site_tasks").update(row).eq("id", task.id)
-      : await supabase.from("site_tasks").insert({ ...row, project_id: projectId });
-    setBusy(false);
-    if (error) return setError(error.message);
-    onSaved();
+    try {
+      const saved = must<{ id: string }>(
+        task
+          ? await supabase.from("site_tasks").update(row).eq("id", task.id).select("id").single()
+          : await supabase.from("site_tasks").insert({ ...row, project_id: projectId }).select("id").single(),
+      );
+      if (files.length) {
+        setProgress(0);
+        await uploadTaskFiles(projectId, saved.id, null, files, setProgress);
+      }
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+      setProgress(null);
+    }
   }
 
   return (
@@ -257,8 +308,21 @@ function TaskForm({
             />
           </Field>
         </div>
+        <div className="sm:col-span-2">
+          <div className="mb-1.5 text-xs text-silver-dim">{k.files}</div>
+          <FileGallery files={existing.data ?? []} canDelete={() => true} onDelete={removeExisting} />
+          <div className="mt-2">
+            <FilePicker files={files} onChange={setFiles} t={t} />
+          </div>
+          <PickedFiles files={files} onChange={setFiles} />
+        </div>
       </div>
-      <ErrorNote error={error} />
+      {progress !== null && (
+        <p className="mt-3 text-sm text-gold">
+          {k.uploading.replace("{done}", String(progress)).replace("{total}", String(files.length))}
+        </p>
+      )}
+      <ErrorNote error={error ?? existing.error} />
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel}>
           {t.adminUi.cancel}
@@ -282,13 +346,27 @@ export function TaskDates({ task, locale, t }: { task: SiteTask; locale: Locale;
   );
 }
 
-// Comments and status changes of one task, oldest first, with a field to write.
+// Files staff attached to the task itself; loaded only when there are any.
+export function TaskAttachments({ task }: { task: SiteTask }) {
+  const count = taskFileCount(task);
+  return count ? <TaskFileList key={count} taskId={task.id} /> : null;
+}
+
+function TaskFileList({ taskId }: { taskId: string }) {
+  const { data } = useLoad(() => loadTaskFiles(taskId, true));
+  return <FileGallery files={data ?? []} />;
+}
+
+// Comments and status changes of one task, oldest first, with a field to
+// write and to attach photos, videos or files.
 export function TaskThread({
+  projectId,
   taskId,
   locale,
   t,
   onChanged,
 }: {
+  projectId: string;
   taskId: string;
   locale: Locale;
   t: Dictionary;
@@ -297,48 +375,91 @@ export function TaskThread({
   const k = t.tasks;
   const me = useUser();
   const staff = isStaff(me);
-  const { data, error, reload } = useLoad(async () =>
-    must<TaskComment[]>(
-      await createClient()
+  const { data, error, reload } = useLoad(async () => {
+    const [comments, files] = await Promise.all([
+      createClient()
         .from("site_task_comments")
         .select("id, author_id, status, body, created_at, author:profiles(full_name, email)")
         .eq("task_id", taskId)
         .order("created_at")
         .overrideTypes<TaskComment[], { merge: false }>(),
-    ),
-  );
+      loadTaskFiles(taskId),
+    ]);
+    const byComment = new Map<number, TaskFile[]>();
+    for (const f of files) {
+      if (f.comment_id !== null) byComment.set(f.comment_id, [...(byComment.get(f.comment_id) ?? []), f]);
+    }
+    return { comments: must<TaskComment[]>(comments), files: byComment };
+  });
   const [body, setBody] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [progress, setProgress] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const dateTime = new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: "short", timeStyle: "short" });
+  const busy = progress !== null;
+  const canDelete = (authorId: string | null) => staff || authorId === me.id;
 
   async function send() {
-    if (!body.trim()) return;
-    setBusy(true);
-    const { error } = await createClient()
-      .from("site_task_comments")
-      .insert({ task_id: taskId, author_id: me.id, body: body.trim() });
-    setBusy(false);
-    setActionError(error?.message ?? null);
-    if (!error) setBody("");
+    if (!body.trim() && !files.length) return;
+    const big = tooLarge(files, t);
+    if (big) return setActionError(big);
+    const supabase = createClient();
+    setActionError(null);
+    setProgress(0);
+    let commentId: number | null = null;
+    try {
+      commentId = must<{ id: number }>(
+        await supabase
+          .from("site_task_comments")
+          .insert({ task_id: taskId, author_id: me.id, body: body.trim() || null })
+          .select("id")
+          .single(),
+      ).id;
+      await uploadTaskFiles(projectId, taskId, commentId, files, setProgress);
+      setBody("");
+      setFiles([]);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+      // A comment that was only meant to carry the files is dropped again.
+      if (commentId !== null && !body.trim()) {
+        await removeTaskFiles(await taskFilePaths("comment_id", commentId).catch(() => []));
+        await supabase.from("site_task_comments").delete().eq("id", commentId);
+      }
+    }
+    setProgress(null);
     reload();
     onChanged();
   }
 
-  async function remove(id: number) {
+  async function remove(c: TaskComment) {
     if (!window.confirm(k.confirmDeleteComment)) return;
-    const { error } = await createClient().from("site_task_comments").delete().eq("id", id);
-    setActionError(error?.message ?? null);
+    try {
+      await removeTaskFiles((data?.files.get(c.id) ?? []).map((f) => f.storage_path));
+      must(await createClient().from("site_task_comments").delete().eq("id", c.id));
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+    reload();
+    onChanged();
+  }
+
+  async function removeFile(file: TaskFile) {
+    if (!window.confirm(k.confirmDeleteFile)) return;
+    try {
+      await removeTaskFile(file);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
     reload();
     onChanged();
   }
 
   return (
     <div className="mt-3 border-t border-line pt-3">
-      <ErrorNote error={error ?? actionError} />
-      {data && !data.length && <p className="text-sm text-silver-dim">{k.noComments}</p>}
+      <ErrorNote error={error} />
+      {data && !data.comments.length && <p className="text-sm text-silver-dim">{k.noComments}</p>}
       <ol className="space-y-3">
-        {data?.map((c) => {
+        {data?.comments.map((c) => {
           const who = c.author_id === me.id ? k.you : personName(c.author);
           return c.status ? (
             <li key={c.id} className="flex flex-wrap items-center gap-2 text-xs text-silver-dim">
@@ -354,18 +475,24 @@ export function TaskThread({
                   <span className={c.author_id === me.id ? "text-gold" : "text-silver"}>{who}</span> ·{" "}
                   {dateTime.format(new Date(c.created_at))}
                 </span>
-                {(staff || c.author_id === me.id) && (
-                  <button onClick={() => remove(c.id)} title={t.adminUi.delete} className="p-1 text-silver-dim hover:text-red-400">
+                {canDelete(c.author_id) && (
+                  <button onClick={() => remove(c)} title={t.adminUi.delete} className="p-1 text-silver-dim hover:text-red-400">
                     <Trash2 size={13} />
                   </button>
                 )}
               </div>
-              <p className="mt-1 whitespace-pre-line text-sm text-silver">{c.body}</p>
+              {c.body && <p className="mt-1 whitespace-pre-line text-sm text-silver">{c.body}</p>}
+              <FileGallery
+                files={data.files.get(c.id) ?? []}
+                canDelete={(f) => canDelete(f.author_id)}
+                onDelete={removeFile}
+              />
             </li>
           );
         })}
       </ol>
       <div className="mt-3 flex items-end gap-2">
+        <FilePicker files={files} onChange={setFiles} t={t} compact />
         <Textarea
           rows={2}
           value={body}
@@ -373,10 +500,22 @@ export function TaskThread({
           onChange={(e) => setBody(e.target.value)}
           className="min-h-0 flex-1"
         />
-        <Button onClick={send} disabled={busy || !body.trim()} aria-label={k.send} className="shrink-0">
+        <Button
+          onClick={send}
+          disabled={busy || (!body.trim() && !files.length)}
+          aria-label={k.send}
+          className="shrink-0"
+        >
           <Send size={16} />
         </Button>
       </div>
+      <PickedFiles files={files} onChange={setFiles} />
+      {progress !== null && files.length > 0 && (
+        <p className="mt-2 text-sm text-gold">
+          {k.uploading.replace("{done}", String(progress)).replace("{total}", String(files.length))}
+        </p>
+      )}
+      <ErrorNote error={actionError} />
     </div>
   );
 }
