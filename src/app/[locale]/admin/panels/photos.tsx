@@ -92,6 +92,12 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
       return error?.message ?? null;
     });
 
+  const download = (p: SitePhoto) =>
+    downloadPhoto(p, p.project?.name).then(
+      () => setActionError(null),
+      (e: Error) => setActionError(e.message),
+    );
+
   const remove = (p: SitePhoto) => {
     if (!window.confirm(k.confirmDelete)) return;
     setOpenIndex(null);
@@ -171,7 +177,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
             </h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {d.items.map(({ photo: p, index }) => (
-                <figure key={p.id} className="overflow-hidden rounded-xl border border-line bg-panel">
+                <figure key={p.id} className="flex flex-col overflow-hidden rounded-xl border border-line bg-panel">
                   <button
                     onClick={() => setOpenIndex(index)}
                     className="relative block aspect-square w-full bg-panel-2"
@@ -192,13 +198,24 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
                       </Badge>
                     </span>
                   </button>
-                  <figcaption className="space-y-1 px-3 py-2 text-xs text-silver-dim">
+                  <figcaption className="flex flex-1 flex-col gap-1 px-3 py-2 text-xs text-silver-dim">
                     {!filter.project && <div className="truncate font-medium text-silver">{p.project?.name}</div>}
                     <div className="truncate">
                       {time.format(new Date(p.created_at))} · {personName(p.author)}
                     </div>
                     {p.stage && <div className="truncate">{p.stage.title}</div>}
                     {p.caption && <div className="line-clamp-2 text-silver">{p.caption}</div>}
+                    <div className="mt-auto flex justify-end gap-1.5 pt-1">
+                      <IconButton className="p-2!" onClick={() => download(p)} title={k.download}>
+                        <Download size={14} />
+                      </IconButton>
+                      <IconButton className="p-2!" onClick={() => setEditing(p)} title={k.edit}>
+                        <Pencil size={14} />
+                      </IconButton>
+                      <IconButton danger className="p-2!" onClick={() => remove(p)} title={a.delete}>
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </div>
                   </figcaption>
                 </figure>
               ))}
@@ -245,7 +262,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
           onToggle={() => toggle(opened)}
           paused={!!editing}
           onEdit={() => setEditing(opened)}
-          onDownload={() => run(() => downloadPhoto(opened, opened.project?.name).then(() => null, (e: Error) => e.message))}
+          onDownload={() => download(opened)}
           onDelete={() => remove(opened)}
         />
       )}
@@ -493,7 +510,7 @@ export async function downloadPhoto(photo: { storage_path: string; created_at: s
   const d = new Date(photo.created_at);
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
-  const site = (siteName ?? "foto").normalize("NFKD").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "foto";
+  const site = (siteName ?? "foto").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "foto";
   const url = URL.createObjectURL(data);
   const link = document.createElement("a");
   link.href = url;
