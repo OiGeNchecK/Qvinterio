@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, Trash2, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, ExternalLink, Trash2, X } from "lucide-react";
 import { Button } from "@/components/button";
 import { createClient } from "@/lib/supabase/client";
 import { dateLocale, type Dictionary, type Locale } from "@/i18n";
-import { Badge, ErrorNote, IconButton, Panel, SectionHeader, Select, must, useLoad } from "../kit";
-import { loadPeople, loadProjectRefs, personName } from "../data";
+import { Badge, ErrorNote, Field, IconButton, Input, Modal, Panel, SectionHeader, Select, emptyToNull, must, useLoad } from "../kit";
+import { loadPeople, loadProjectRefs, personName, type ProjectRef } from "../data";
+import { shrink } from "../upload";
 
 const BUCKET = "project-photos";
 const PAGE = 120;
@@ -20,23 +21,24 @@ export type SitePhoto = {
   caption: string | null;
   visible_to_client: boolean;
   taken_at: string;
+  created_at: string;
   project: { name: string } | null;
   stage: { title: string } | null;
   author: { full_name: string; email: string | null } | null;
   url?: string;
 };
 
-type Filter = { project: string; author: string; visibility: "" | "client" | "internal" };
+type Filter = { project: string; author: string; visibility: "" | "client" | "internal"; order: "newest" | "oldest" };
 
-// Newest first, with a signed URL for each file (the bucket is private).
+// Sorted by upload date, with a signed URL for each file (the bucket is private).
 export async function loadSitePhotos(filter: Partial<Filter>, limit: number) {
   const supabase = createClient();
   let query = supabase
     .from("photos")
     .select(
-      "id, project_id, author_id, storage_path, caption, visible_to_client, taken_at, project:projects(name), stage:project_stages(title), author:profiles(full_name, email)",
+      "id, project_id, author_id, storage_path, caption, visible_to_client, taken_at, created_at, project:projects(name), stage:project_stages(title), author:profiles(full_name, email)",
     )
-    .order("taken_at", { ascending: false })
+    .order("created_at", { ascending: filter.order === "oldest" })
     .limit(limit);
   if (filter.project) query = query.eq("project_id", filter.project);
   if (filter.author) query = query.eq("author_id", filter.author);
@@ -49,7 +51,7 @@ export async function loadSitePhotos(filter: Partial<Filter>, limit: number) {
   return list.map((p) => ({ ...p, url: urlByPath.get(p.storage_path) ?? undefined }));
 }
 
-// Photos the workers upload, for admins and the Bauleitung, grouped by day.
+// Site photos for admins and the Bauleitung, grouped by upload day.
 export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) {
   const k = t.sitePhotos;
   const a = t.adminUi;
@@ -59,6 +61,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
     project: new URLSearchParams(window.location.search).get("project") ?? "",
     author: "",
     visibility: "",
+    order: "newest",
   }));
   const [limit, setLimit] = useState(PAGE);
   const refs = useLoad(async () => {
@@ -68,6 +71,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   const { data, error, reload } = useLoad(() => loadSitePhotos(filter, limit));
   const [actionError, setActionError] = useState<string | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   function change(next: Partial<Filter>) {
     setFilter({ ...filter, ...next });
@@ -102,7 +106,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
   const time = new Intl.DateTimeFormat(dateLocale(locale), { timeStyle: "short" });
   const days: { key: string; label: string; items: { photo: SitePhoto; index: number }[] }[] = [];
   photos.forEach((photo, index) => {
-    const d = new Date(photo.taken_at);
+    const d = new Date(photo.created_at);
     const key = d.toDateString();
     if (days.at(-1)?.key !== key) days.push({ key, label: day.format(d), items: [] });
     days.at(-1)!.items.push({ photo, index });
@@ -139,6 +143,13 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
           <option value="client">{k.forClient}</option>
           <option value="internal">{k.internalOnly}</option>
         </Select>
+        <Select value={filter.order} onChange={(e) => change({ order: e.target.value as Filter["order"] })} className="w-auto">
+          <option value="newest">{k.newestFirst}</option>
+          <option value="oldest">{k.oldestFirst}</option>
+        </Select>
+        <Button onClick={() => setUploading(true)}>
+          <Camera size={16} /> {k.upload}
+        </Button>
       </SectionHeader>
       <p className="-mt-3 mb-5 text-sm text-silver-dim">{k.hint}</p>
       <ErrorNote error={error ?? refs.error ?? actionError} />
@@ -182,7 +193,7 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
                   <figcaption className="space-y-1 px-3 py-2 text-xs text-silver-dim">
                     {!filter.project && <div className="truncate font-medium text-silver">{p.project?.name}</div>}
                     <div className="truncate">
-                      {time.format(new Date(p.taken_at))} · {personName(p.author)}
+                      {time.format(new Date(p.created_at))} · {personName(p.author)}
                     </div>
                     {p.stage && <div className="truncate">{p.stage.title}</div>}
                     {p.caption && <div className="line-clamp-2 text-silver">{p.caption}</div>}
@@ -208,6 +219,19 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
         </div>
       )}
 
+      {uploading && refs.data && (
+        <UploadModal
+          projects={refs.data.projects}
+          projectId={filter.project}
+          t={t}
+          onClose={() => setUploading(false)}
+          onUploaded={(projectId) => {
+            setUploading(false);
+            change({ project: projectId, author: "", visibility: "", order: "newest" });
+          }}
+        />
+      )}
+
       {opened && openIndex !== null && (
         <PhotoViewer
           photo={opened}
@@ -221,6 +245,144 @@ export function PhotosSection({ locale, t }: { locale: Locale; t: Dictionary }) 
         />
       )}
     </div>
+  );
+}
+
+// Admins and the Bauleitung add photos to a site themselves.
+function UploadModal({
+  projects,
+  projectId,
+  t,
+  onClose,
+  onUploaded,
+}: {
+  projects: ProjectRef[];
+  projectId: string;
+  t: Dictionary;
+  onClose: () => void;
+  onUploaded: (projectId: string) => void;
+}) {
+  const k = t.sitePhotos;
+  const w = t.worker;
+  const [form, setForm] = useState({ project_id: projectId, stage_id: "", caption: "", visible_to_client: true });
+  const [loadedStages, setStages] = useState<{ projectId: string; list: { id: string; title: string }[] }>({ projectId: "", list: [] });
+  const stages = loadedStages.projectId === form.project_id ? loadedStages.list : [];
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const projectId = form.project_id;
+    if (!projectId) return;
+    let active = true;
+    createClient()
+      .from("project_stages")
+      .select("id, title")
+      .eq("project_id", projectId)
+      .order("position")
+      .then(({ data }) => active && setStages({ projectId, list: data ?? [] }));
+    return () => {
+      active = false;
+    };
+  }, [form.project_id]);
+
+  async function upload(files: File[]) {
+    if (!files.length) return;
+    if (!form.project_id) return setError(k.chooseSite);
+    const supabase = createClient();
+    setError(null);
+    setProgress({ done: 0, total: files.length });
+    try {
+      for (const [i, file] of files.entries()) {
+        const blob = await shrink(file);
+        const ext = blob.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const path = `${form.project_id}/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || file.type });
+        if (error) throw new Error(error.message);
+        const inserted = await supabase.from("photos").insert({
+          project_id: form.project_id,
+          storage_path: path,
+          stage_id: form.stage_id || null,
+          caption: emptyToNull(form.caption),
+          visible_to_client: form.visible_to_client,
+        });
+        if (inserted.error) {
+          await supabase.storage.from(BUCKET).remove([path]);
+          throw new Error(inserted.error.message);
+        }
+        setProgress({ done: i + 1, total: files.length });
+      }
+      onUploaded(form.project_id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setProgress(null);
+    }
+  }
+
+  return (
+    <Modal title={k.upload} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label={t.adminUi.site}>
+          <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value, stage_id: "" })}>
+            <option value="">—</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {!!stages.length && (
+          <Field label={w.stage}>
+            <Select value={form.stage_id} onChange={(e) => setForm({ ...form, stage_id: e.target.value })}>
+              <option value="">—</option>
+              {stages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        <Field label={w.caption}>
+          <Input value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} />
+        </Field>
+        <label className="flex items-center gap-2 text-sm text-silver">
+          <input
+            type="checkbox"
+            checked={form.visible_to_client}
+            onChange={(e) => setForm({ ...form, visible_to_client: e.target.checked })}
+            className="accent-[var(--color-gold)]"
+          />
+          {w.visibleToClient}
+        </label>
+      </div>
+      <ErrorNote error={error} />
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <label
+          className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-gradient-to-b from-olive-light to-olive px-5 py-3 text-sm font-medium text-ink transition hover:brightness-110 sm:w-auto sm:py-2.5 ${
+            progress || !form.project_id ? "pointer-events-none opacity-50" : ""
+          }`}
+        >
+          <Camera size={16} /> {k.chooseFiles}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={!!progress || !form.project_id}
+            onChange={(e) => {
+              upload(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {progress && (
+          <span className="text-sm text-silver-dim">
+            {w.uploading.replace("{done}", String(progress.done)).replace("{total}", String(progress.total))}
+          </span>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -265,7 +427,7 @@ function PhotoViewer({
         <div className="min-w-0 text-sm">
           <div className="truncate font-medium text-silver">{p.project?.name}</div>
           <div className="text-xs text-silver-dim sm:truncate">
-            {when.format(new Date(p.taken_at))} · {k.by} {personName(p.author)}
+            {when.format(new Date(p.created_at))} · {k.by} {personName(p.author)}
             {p.stage ? ` · ${k.stage}: ${p.stage.title}` : ""}
           </div>
         </div>

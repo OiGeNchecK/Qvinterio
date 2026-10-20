@@ -408,6 +408,11 @@ const de = {
     other: "Sonstiges",
   },
   sitePhotos: {
+    newestFirst: "Neueste zuerst",
+    oldestFirst: "Älteste zuerst",
+    upload: "Fotos hochladen",
+    chooseFiles: "Fotos auswählen",
+    chooseSite: "Bitte eine Baustelle wählen.",
     open: "Fotos",
     allPeople: "Alle Mitarbeiter",
     allVisibility: "Alle Fotos",
@@ -424,7 +429,7 @@ const de = {
     more: "Ältere Fotos laden",
     previous: "Vorheriges Foto",
     next: "Nächstes Foto",
-    hint: "Alle Fotos, die Mitarbeiter auf den Baustellen hochladen, nach Tag sortiert.",
+    hint: "Alle Fotos, die auf den Baustellen hochgeladen werden, nach Datum des Hochladens sortiert.",
     latest: "Neue Fotos von den Baustellen",
   },
   tasks: {

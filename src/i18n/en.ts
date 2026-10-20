@@ -410,6 +410,11 @@ const en: Dictionary = {
     other: "Other",
   },
   sitePhotos: {
+    newestFirst: "Newest first",
+    oldestFirst: "Oldest first",
+    upload: "Upload photos",
+    chooseFiles: "Choose photos",
+    chooseSite: "Please choose a site.",
     open: "Photos",
     allPeople: "All workers",
     allVisibility: "All photos",
@@ -426,7 +431,7 @@ const en: Dictionary = {
     more: "Load older photos",
     previous: "Previous photo",
     next: "Next photo",
-    hint: "All photos workers upload on the sites, sorted by day.",
+    hint: "All photos uploaded on the sites, sorted by upload date.",
     latest: "New photos from the sites",
   },
   tasks: {

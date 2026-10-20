@@ -410,6 +410,11 @@ const uk: Dictionary = {
     other: "Інше",
   },
   sitePhotos: {
+    newestFirst: "Спочатку нові",
+    oldestFirst: "Спочатку старі",
+    upload: "Завантажити фото",
+    chooseFiles: "Вибрати фото",
+    chooseSite: "Виберіть будову.",
     open: "Фото",
     allPeople: "Усі працівники",
     allVisibility: "Усі фото",
@@ -426,7 +431,7 @@ const uk: Dictionary = {
     more: "Завантажити старіші фото",
     previous: "Попереднє фото",
     next: "Наступне фото",
-    hint: "Усі фото, які працівники завантажують на будовах, по днях.",
+    hint: "Усі фото, завантажені на будовах, за датою додавання.",
     latest: "Нові фото з будов",
   },
   tasks: {

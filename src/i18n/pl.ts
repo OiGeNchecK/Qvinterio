@@ -410,6 +410,11 @@ const pl: Dictionary = {
     other: "Inne",
   },
   sitePhotos: {
+    newestFirst: "Najnowsze najpierw",
+    oldestFirst: "Najstarsze najpierw",
+    upload: "Dodaj zdjęcia",
+    chooseFiles: "Wybierz zdjęcia",
+    chooseSite: "Wybierz budowę.",
     open: "Zdjęcia",
     allPeople: "Wszyscy pracownicy",
     allVisibility: "Wszystkie zdjęcia",
@@ -426,7 +431,7 @@ const pl: Dictionary = {
     more: "Wczytaj starsze zdjęcia",
     previous: "Poprzednie zdjęcie",
     next: "Następne zdjęcie",
-    hint: "Wszystkie zdjęcia, które pracownicy dodają na budowach, według dni.",
+    hint: "Wszystkie zdjęcia dodane na budowach, według daty dodania.",
     latest: "Nowe zdjęcia z budów",
   },
   tasks: {
