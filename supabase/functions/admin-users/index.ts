@@ -1,7 +1,7 @@
 // Account management that needs the service key.
 // Admins: create a user with roles, set a user's password.
-// Staff (admin or manager): give a client access to a site with a generated
-// password, or generate a new password for a client.
+// Staff (admin or manager): create a client access key bound to one site,
+// or replace a client's key.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ROLES = ["admin", "manager", "worker", "client"];
@@ -16,12 +16,20 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
-// Readable password without look-alike characters, e.g. "Kx7m-Qp4r-Zt9w".
-function generatePassword() {
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+// Readable key without look-alike characters, e.g. "K7MQ-P4RZ-T9WX".
+function generateKey() {
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   const bytes = crypto.getRandomValues(new Uint8Array(12));
   const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
   return `${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8)}`;
+}
+
+// Same derivation as src/lib/client-key.ts: the login page turns the key into this e-mail.
+const KEY_EMAIL_DOMAIN = "kunde.qvinterio.de";
+async function keyEmail(key: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+  return `key-${hex.slice(0, 24)}@${KEY_EMAIL_DOMAIN}`;
 }
 
 Deno.serve(async (req) => {
@@ -42,64 +50,56 @@ Deno.serve(async (req) => {
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = await req.json().catch(() => ({}));
 
-  // Only accounts that are nothing but clients may get a password from staff.
+  // Only accounts that are nothing but clients may get a new key from staff.
   async function isClientOnly(userId: string) {
     const { data } = await admin.from("user_roles").select("role").eq("user_id", userId);
     const roles = (data ?? []).map((r: { role: string }) => r.role);
-    return roles.every((r) => r === "client");
+    return roles.length > 0 && roles.every((r) => r === "client");
   }
 
-  async function newClientPassword(userId: string) {
-    const password = generatePassword();
-    const { data, error } = await admin.auth.admin.updateUserById(userId, { password });
+  // A new key replaces the old one; the e-mail follows the key.
+  async function newClientKey(userId: string) {
+    const key = generateKey();
+    const email = await keyEmail(key);
+    const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true, password: key });
     if (error) throw new Error(error.message);
-    return { email: data.user.email, password };
+    await admin.from("profiles").update({ email }).eq("id", userId);
+    return { key };
   }
 
   try {
-    if (body.action === "client_access") {
+    if (body.action === "client_key") {
       const projectId = typeof body.project_id === "string" ? body.project_id : "";
       const expiresAt = typeof body.expires_at === "string" ? body.expires_at : "";
-      if (!projectId || !expiresAt) return json({ error: "Site and end date are required" }, 400);
+      const name = typeof body.full_name === "string" ? body.full_name.trim() : "";
+      if (!projectId || !expiresAt || !name) return json({ error: "Name, site and end date are required" }, 400);
 
-      let clientId: string | null = typeof body.client_id === "string" ? body.client_id : null;
-      let password: string | null = null;
-      let email: string | null = null;
+      const key = generateKey();
+      const { data, error } = await admin.auth.admin.createUser({
+        email: await keyEmail(key),
+        password: key,
+        email_confirm: true,
+        user_metadata: { full_name: name },
+      });
+      if (error) return json({ error: error.message }, 400);
+      const clientId = data.user.id;
 
-      if (!clientId) {
-        email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-        if (!email) return json({ error: "E-mail is required" }, 400);
-        const { data: existing } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
-        if (existing) {
-          clientId = existing.id as string;
-          if (!(await isClientOnly(clientId))) return json({ error: "This e-mail belongs to a team member" }, 400);
-          password = (await newClientPassword(clientId)).password;
-        } else {
-          password = generatePassword();
-          const fullName = typeof body.full_name === "string" ? body.full_name.trim() : "";
-          const { data, error } = await admin.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-            user_metadata: { full_name: fullName },
-          });
-          if (error) return json({ error: error.message }, 400);
-          clientId = data.user.id;
-        }
-        await admin.from("user_roles").upsert({ user_id: clientId, role: "client" }, { ignoreDuplicates: true });
-      }
-
-      const { error } = await admin
+      const role = await admin.from("user_roles").insert({ user_id: clientId, role: "client" });
+      const grant = await admin
         .from("client_access")
         .insert({ project_id: projectId, client_id: clientId, expires_at: expiresAt, created_by: me.user.id });
-      if (error) return json({ error: error.message }, 400);
-      return json({ id: clientId, email, password });
+      const failed = role.error ?? grant.error;
+      if (failed) {
+        await admin.auth.admin.deleteUser(clientId);
+        return json({ error: failed.message }, 400);
+      }
+      return json({ id: clientId, key });
     }
 
-    if (body.action === "client_password") {
+    if (body.action === "client_new_key") {
       if (typeof body.client_id !== "string") return json({ error: "client_id is required" }, 400);
       if (!(await isClientOnly(body.client_id))) return json({ error: "Only client accounts" }, 400);
-      return json({ id: body.client_id, ...(await newClientPassword(body.client_id)) });
+      return json({ id: body.client_id, ...(await newClientKey(body.client_id)) });
     }
 
     if (!isAdmin) return json({ error: "Forbidden" }, 403);

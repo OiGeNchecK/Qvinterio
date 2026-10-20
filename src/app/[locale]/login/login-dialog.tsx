@@ -61,7 +61,7 @@ export function LoginDialog({ locale, t }: { locale: Locale; t: Dictionary }) {
             <p className="mt-1 text-sm text-silver-dim">{t.login.subtitles[mode]}</p>
           </div>
         </div>
-        <LoginForm locale={locale} labels={t.login} />
+        <LoginForm locale={locale} labels={t.login} keyOnly={mode === "client"} />
       </div>
     </div>
   );
